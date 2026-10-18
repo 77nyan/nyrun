@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.4
+- The details panel (and the episode browser) only show a picture when the title has a real poster. Empty categories no longer show the purple play placeholder.
+- Posters in the grid are a little smaller (10 rows instead of 12, slightly less tall), so more of the library fits on screen.
+
 ## 1.4.3
 - Home: the percentage under Movies / Series / Shows (and the overall "% watched") now counts part-watched films and episodes. One film stopped at 74% shows 74% instead of 0%.
 

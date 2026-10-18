@@ -47,7 +47,7 @@ Screen { background: $background; }
     padding: 1 2;
     background: $surface 40%;
 }
-#detail-poster-box { width: 100%; height: auto; align-horizontal: center; margin-bottom: 1; }
+#detail-poster-box { width: 100%; height: auto; align-horizontal: center; margin-bottom: 1; display: none; }
 #detail-title { text-style: bold; color: $accent; width: 100%; }
 #detail-info { width: 100%; height: auto; }
 

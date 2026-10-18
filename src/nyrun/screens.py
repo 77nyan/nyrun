@@ -342,12 +342,12 @@ class LibraryScreen(Screen):
         w, h = grid.size.width, grid.size.height
         if w <= 0 or h <= 0:
             return
-        if h >= 16:
-            pr, rows = 12, max(1, h // 16)
+        if h >= 14:
+            pr, rows = 10, max(1, h // 14)  # poster rows + title, badge and border = 14 lines per card
         else:
             pr, rows = max(5, h - 4), 1
         square = self.category == "Music"  # album covers are square; film posters are portrait
-        pc = pr * 2 if square else pr * 4 // 3
+        pc = pr * 2 if square else pr * 7 // 5
         cols = max(1, w // (pc + 3))
         # the details picture: a small square in real pixels (a cell is roughly twice as tall as wide)
         dr = 7 if self.size.height >= 38 else max(4, self.size.height - 30)
@@ -418,8 +418,11 @@ class LibraryScreen(Screen):
     def _update_detail(self) -> None:
         item = self.current
         dc, dr = self._detail_dims
-        set_poster(self.query_one("#detail-poster"), item, dc, dr)
-        self.query_one("#detail-poster-box").styles.height = dr  # never taller than the picture should be
+        box = self.query_one("#detail-poster-box")
+        box.display = bool(item and item.poster)  # no real poster (or nothing selected): no picture, no placeholder
+        if box.display:
+            set_poster(self.query_one("#detail-poster"), item, dc, dr)
+            box.styles.height = dr  # never taller than the picture should be
         self.query_one("#detail-title", Label).update(item.title if item else "")
         info = self.query_one("#detail-info", Static)
         if not item:
@@ -626,7 +629,8 @@ class EpisodeScreen(Screen):
         yield Header()
         with Horizontal(id="ep-body"):
             with Vertical(id="ep-side"):
-                yield make_poster(self.item, 24, 18)
+                if self.item.poster:
+                    yield make_poster(self.item, 24, 18)
                 yield Label(self.item.title, id="ep-title", markup=False)
                 yield Static(id="ep-info")
             yield OptionList(id="ep-list")

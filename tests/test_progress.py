@@ -252,3 +252,23 @@ def test_home_category_percentage_follows_part_watched_film(tmp_path):
             assert "74%" in _tile_text(app, "Movies")
 
     asyncio.run(go())
+
+
+def test_details_picture_only_with_a_real_poster(library, tmp_path):
+    from nyrun.screens import LibraryScreen
+
+    empty = tmp_path / "Empty"
+    for cat in ("Movies", "Series", "Shows", "Music"):
+        (empty / cat).mkdir(parents=True)
+
+    async def go(root):
+        app = make_app(root)
+        async with app.run_test(size=SIZE) as pilot:
+            await pilot.pause(0.3)
+            await pilot.press("1")
+            await pilot.pause(0.5)
+            assert isinstance(app.screen, LibraryScreen)
+            return app.screen.query_one("#detail-poster-box").display
+
+    assert asyncio.run(go(library)) is True    # first film has a poster: picture shown
+    assert asyncio.run(go(empty)) is False     # nothing here yet: no purple placeholder
