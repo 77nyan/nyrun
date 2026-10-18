@@ -63,7 +63,10 @@ class Settings:
 
     default_folder: str = ""
     theme: str = "auto"  # auto | omarchy | terminal | <theme name>
-    auto_watched: bool = True  # mark an item watched when you press play
+    auto_watched: bool = True  # albums: mark as listened when you press play
+    track_progress: bool = True  # watch VLC while a film plays: real progress, watched at the end
+    watched_at: int = 90  # percent of a film/episode that counts as "watched"
+    resume: bool = True  # start again where you stopped
     logo_line: str = "rainbow"  # colour of the line under the NyRun logo: rainbow | theme
 
     # ---- Music ----
@@ -123,6 +126,11 @@ class State:
         self.last_played: dict[str, float] = dict(raw.get("last_played", {}))
         self.play_count: dict[str, int] = dict(raw.get("play_count", {}))
         self.last_episode: dict[str, str] = dict(raw.get("last_episode", {}))
+        # key -> [seconds watched, total seconds] for things you stopped part-way through
+        self.positions: dict[str, list[float]] = {
+            k: [float(v[0]), float(v[1])] for k, v in dict(raw.get("positions", {})).items()
+            if isinstance(v, (list, tuple)) and len(v) == 2
+        }
 
     def save(self) -> None:
         _write_json(
@@ -133,22 +141,36 @@ class State:
                 "last_played": self.last_played,
                 "play_count": self.play_count,
                 "last_episode": self.last_episode,
+                "positions": self.positions,
             },
         )
 
     def toggle_watched(self, key: str) -> bool:
-        if key in self.watched:
-            self.watched.discard(key)
-            result = False
-        else:
-            self.watched.add(key)
-            result = True
-        self.save()
+        result = key not in self.watched
+        self.set_watched(key, result)
         return result
 
     def set_watched(self, key: str, value: bool) -> None:
         (self.watched.add if value else self.watched.discard)(key)
+        self.positions.pop(key, None)  # watched or reset: no half-way point to remember
         self.save()
+
+    def set_position(self, key: str, seconds: float, total: float) -> None:
+        """Remember where you stopped (in memory; call save() to write it)."""
+        self.positions[key] = [round(seconds, 1), round(total, 1)]
+
+    def resume_point(self, key: str, minimum: float = 20.0) -> float | None:
+        """Seconds to resume at, or None (never started, finished, or only just begun)."""
+        pos = self.positions.get(key)
+        if key in self.watched or not pos or pos[0] < minimum:
+            return None
+        return pos[0]
+
+    def percent(self, key: str) -> int | None:
+        pos = self.positions.get(key)
+        if not pos or pos[1] <= 0:
+            return None
+        return max(1, min(99, int(pos[0] / pos[1] * 100)))
 
     def toggle_favorite(self, key: str) -> bool:
         if key in self.favorites:

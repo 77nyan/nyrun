@@ -118,3 +118,77 @@ for line in sys.stdin:
     script.chmod(script.stat().st_mode | stat.S_IEXEC)
     monkeypatch.setenv("NYRUN_VLC", str(script))
     return log
+
+
+FAKE_WATCH_SCRIPT = r"""#!__PY__
+import os, re, socket, sys, time
+log = open(__LOG__, "a", buffering=1)
+log.write("ARGS " + " ".join(sys.argv[1:]) + "\n")
+m = next((re.match(r"--rc-host=(.+):(\d+)", a) for a in sys.argv if a.startswith("--rc-host=")), None)
+if not m:
+    sys.exit(0)
+length = float(os.environ.get("FAKE_LEN", "100"))
+stop = float(os.environ.get("FAKE_STOP", "50"))
+speed = float(os.environ.get("FAKE_SPEED", "40"))
+files = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+srv = socket.socket()
+srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+srv.bind((m.group(1), int(m.group(2))))
+srv.listen(1)
+srv.settimeout(20)
+conn, _ = srv.accept()
+conn.settimeout(0.05)
+t0 = time.time()
+offset = 0.0
+def pos():
+    return offset + (time.time() - t0) * speed
+while pos() < stop:
+    try:
+        data = conn.recv(1024)
+    except socket.timeout:
+        continue
+    if not data:
+        break
+    for cmd in data.decode().split("\n"):
+        cmd = cmd.strip()
+        if not cmd:
+            continue
+        log.write("CMD " + cmd + "\n")
+        if cmd == "get_time":
+            conn.sendall(("%d\r\n" % int(pos())).encode())
+        elif cmd == "get_length":
+            conn.sendall(("%d\r\n" % int(length)).encode())
+        elif cmd == "playlist":
+            body = "".join(("|   *%d - %s\r\n" if n == 1 else "|    %d - %s\r\n") % (n, os.path.basename(f))
+                           for n, f in enumerate(files, 1))
+            conn.sendall(("+----[ Playlist ]\r\n" + body + "+----[ End of playlist ]\r\n").encode())
+        elif cmd.startswith("seek"):
+            offset = float(cmd.split()[1]) - (time.time() - t0) * speed
+log.write("EXIT\n")
+"""
+
+
+@pytest.fixture
+def fake_watch_vlc(tmp_path, monkeypatch):
+    """A 'VLC' that listens on --rc-host like the real rc interface and pretends to play.
+
+    Call it as fake_watch_vlc(length=100, stop=50, speed=40): the film is `length` seconds long,
+    time runs `speed` times faster than real life, and the 'user' quits when it reaches `stop`.
+    Returns the log path (ARGS line, then CMD lines).
+    """
+    import nyrun.watch as watch
+
+    monkeypatch.setattr(watch, "POLL", 0.1)
+    log = tmp_path / "watch.log"
+    script = tmp_path / "fakevlc-watch"
+    script.write_text(FAKE_WATCH_SCRIPT.replace("__PY__", sys.executable).replace("__LOG__", repr(str(log))))
+    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    monkeypatch.setenv("NYRUN_VLC", str(script))
+
+    def configure(length=100, stop=50, speed=40):
+        monkeypatch.setenv("FAKE_LEN", str(length))
+        monkeypatch.setenv("FAKE_STOP", str(stop))
+        monkeypatch.setenv("FAKE_SPEED", str(speed))
+        return log
+
+    return configure

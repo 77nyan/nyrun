@@ -181,13 +181,24 @@ def log_path() -> Path:
     return cache_dir() / "vlc-last.log"
 
 
-def launch(files: list[Path], s: Settings) -> subprocess.Popen:
+def watch_args(port: int, s: Settings) -> list[str]:
+    """Options that let NyRun ask this VLC how far along it is (see watch.py)."""
+    a = ["--extraintf=rc", f"--rc-host=127.0.0.1:{port}", "--rc-quiet"]
+    if s.vlc_one_instance != "on":
+        a.append("--no-one-instance")  # a hand-off to a running VLC would never answer us
+    return a
+
+
+def launch(files: list[Path], s: Settings, port: int | None = None) -> subprocess.Popen:
     """Start VLC detached from the TUI so closing NyRun never kills the movie.
 
     VLC's own error output goes to a log file so a bad setting can be reported.
+    With `port`, VLC also listens there for NyRun's progress questions.
     """
     vlc = find_vlc(s.vlc_path, s.vlc_launcher)
     cmd = build_command(files, vlc, s)
+    if port:
+        cmd[len(cmd) - len(files) - 1:len(cmd) - len(files) - 1] = watch_args(port, s)  # before "--"
     env = dict(os.environ)
     env.update(vlc_env(s))
     try:

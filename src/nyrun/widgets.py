@@ -201,7 +201,7 @@ class Rainbow(Static):
         self.update(self.line())
 
 
-def badge_for(item: Item, watched_done: int, total: int, favorite: bool) -> str:
+def badge_for(item: Item, watched_done: int, total: int, favorite: bool, percent: int | None = None) -> str:
     bits = []
     if item.year:
         bits.append(item.year)
@@ -210,6 +210,8 @@ def badge_for(item: Item, watched_done: int, total: int, favorite: bool) -> str:
         bits.append(f"{n} track{'s' if n != 1 else ''}")
     if item.is_collection:
         bits.append(f"{watched_done}/{total} eps")
+    if percent and not item.is_collection and not (total and watched_done >= total):
+        bits.append(f"▶ {percent}%")
     if favorite:
         bits.append("♥")
     if not bits and not (total and watched_done >= total):

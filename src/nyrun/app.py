@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from textual import work
@@ -14,8 +15,9 @@ from textual.binding import Binding
 from . import omarchy, themes
 from .config import CATEGORIES, Settings, State
 from .library import Item, scan_library
-from .music import MusicSession
+from .music import MusicSession, mmss
 from .player import VLCNotFound, last_error_lines, launch
+from .watch import VideoWatcher, free_port
 from .styles import CSS
 
 
@@ -128,6 +130,7 @@ class NyRunApp(ThemedApp):
         super().__init__(settings)
         self.root: Path = settings.root or Path.home() / "NyRun"
         self.state = state or State()
+        self._last_save = 0.0
         self.library: dict[str, list[Item]] = {c: [] for c in CATEGORIES}
         self.music: MusicSession | None = None
         self.open_add: Path | str | None = None  # set by `nyrun -add [FILE]`
@@ -164,6 +167,8 @@ class NyRunApp(ThemedApp):
         keys = [e.key for e in item.episodes]
         last = self.state.last_episode.get(item.key)
         if last in keys:
+            if last not in self.state.watched and self.settings.track_progress:
+                return keys.index(last)  # you did not finish it: pick it up again
             nxt = keys.index(last) + 1
             if nxt < len(keys):
                 return nxt
@@ -184,8 +189,12 @@ class NyRunApp(ThemedApp):
                 if item.is_collection:
                     last = self.state.last_episode.get(item.key)
                     keys = [e.key for e in item.episodes]
-                    if last in keys and keys.index(last) + 1 < len(keys):
-                        found.append((played, item, keys.index(last) + 1))
+                    if last in keys:
+                        n = keys.index(last)
+                        if last not in self.state.watched and self.settings.track_progress:
+                            found.append((played, item, n))  # not finished: resume this episode
+                        elif n + 1 < len(keys):
+                            found.append((played, item, n + 1))
                 elif item.key not in self.state.watched:
                     found.append((played, item, 0))
         if not found:
@@ -253,8 +262,10 @@ class NyRunApp(ThemedApp):
         if missing:
             self.notify(f"File is missing: {missing[0].name}. Is the drive connected?", severity="error", markup=False)
             return
+        tracking = self.settings.track_progress
+        port = free_port() if tracking else None
         try:
-            proc = launch(files, self.settings)
+            proc = launch(files, self.settings, port)
         except VLCNotFound as e:
             self.notify(str(e), severity="error", timeout=12, markup=False)
             return
@@ -267,10 +278,37 @@ class NyRunApp(ThemedApp):
         first = eps[0]
         key = first.key if item.is_collection else item.key
         self.state.mark_played(key, parent_key=item.key if item.is_collection else None, episode=first.key)
-        if self.settings.auto_watched:
-            self.state.set_watched(key, True)
+        resume = self.state.resume_point(key) if self.settings.resume else None
+        if tracking and port:
+            entries = [(e.key if item.is_collection else item.key, e.path) for e in eps[: len(files)]]
+            parent = item.key if item.is_collection else None
+            VideoWatcher(
+                proc, port, entries,
+                lambda k, t, total, final, _p=parent: self.call_from_thread(self._progress, k, t, total, final, _p),
+                resume_at=resume,
+            ).start()
         what = f"{item.title} · {first.label}" if item.is_collection else item.title
-        self.notify(f"▶ {what}", markup=False)
+        if resume:
+            self.notify(f"▶ {what} - resuming at {mmss(resume)}", markup=False)
+        else:
+            self.notify(f"▶ {what}", markup=False)
+
+    def _progress(self, key: str, seconds: float, total: float, final: bool, parent: str | None) -> None:
+        """Called (on the UI thread) as VLC reports how far you are."""
+        st = self.state
+        if parent:
+            st.last_episode[parent] = key  # 'Continue' follows the episode you are really on
+            st.last_played[parent] = time.time()
+        if total > 0 and seconds / total * 100 >= self.settings.watched_at:
+            if key not in st.watched:
+                st.set_watched(key, True)
+                self.notify("✓ Marked as watched", markup=False)
+        elif seconds >= 1:
+            st.set_position(key, seconds, total)
+        now = time.time()
+        if final or now - self._last_save > 10:
+            self._last_save = now
+            st.save()
 
     @work(thread=True, group="vlc-watch")
     def _watch_vlc(self, proc: subprocess.Popen) -> None:

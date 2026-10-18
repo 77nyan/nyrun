@@ -46,7 +46,8 @@ def test_home_to_movie_playback(library, fake_vlc):
     app, scr = run(go())
     lines = calls(fake_vlc)
     assert len(lines) == 1 and "Blade Runner 2049" in lines[0] and "--fullscreen" in lines[0]
-    assert "Movies/Blade Runner 2049 (2017)" in State().watched  # auto-marked
+    assert "--extraintf=rc" in lines[0] and "--rc-host=127.0.0.1:" in lines[0]  # progress tracking on
+    assert "Movies/Blade Runner 2049 (2017)" not in State().watched  # pressing play is not "watched"
 
 
 def test_arrow_keys_navigate_and_pages(library, fake_vlc):
@@ -83,15 +84,16 @@ def test_series_opens_episodes_and_queues_rest(library, fake_vlc):
             await pilot.press("down")  # episode 2
             await pilot.press("enter")
             await pilot.pause(0.5)
-            # highlight advances to the next episode
-            assert app.screen.query_one("#ep-list").highlighted == 2
+            # you have not finished episode 2, so it stays the one to pick up
+            assert app.screen.query_one("#ep-list").highlighted == 1
 
     run(go())
     (line,) = calls(fake_vlc)
     assert line.count(".mkv") == 3  # ep2, ep10, season 2 ep1 queued
     assert "ep1.mkv" in line and line.index("ep2.mkv") < line.index("ep10.mkv")
     st = State()
-    assert any(k.endswith("ep2.mkv") for k in st.watched)
+    assert not st.watched  # starting an episode does not mean you watched it
+    assert any(v.endswith("ep2.mkv") for v in st.last_episode.values())
 
 
 def test_play_only_this_episode(library, fake_vlc):

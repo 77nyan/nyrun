@@ -22,7 +22,7 @@ your files stay exactly where they are, and your posters are just image files.
 - **Music player** with a **spinning vinyl record** drawn in pixels, with the album cover as its label (see [Music](#music))
 - **Add a file** (`a`, or `nyrun -add`): a guided 5-step flow. Pick a video, choose Movies / Series / Shows / Music, type the name, optionally give it a poster image, move or copy. NyRun creates the folder with that name and puts the file and the image inside
 - **Import screen**: **move / copy from Downloads or any directory**. Highlight a film, a show, a song or a folder and **move (cut) or copy** it into your library. NyRun picks Music for audio automatically. A lone file gets its own folder and its subtitles and poster come along
-- **Continue watching** (only shown when there is something to resume): jumps to your next unwatched episode, and the rest of the season is queued in VLC
+- **Continue watching** (only shown when there is something to resume): jumps to the film or episode you left half-way (or your next unwatched episode), and the rest of the season is queued in VLC
 - **Watched** and **favorite** marks, **search**, **sort** (name / added / last played / year / size) and **views** (all / unwatched / watched / favorites)
 - **Matches your Omarchy theme** and follows it live: switch themes in Omarchy and NyRun recolours itself within a couple of seconds
 - **Theme picker** (`nyrun -theme`) with live preview, 16 built-in themes, your own themes, or your terminal's own colours
@@ -219,8 +219,8 @@ Using the Flatpak VLC? It cannot see folders outside your home until you allow i
 
 - **Where settings live:** `~/.config/nyrun/` (`config.json`, `state.json`) on Linux/macOS, `%APPDATA%\nyrun\` on Windows. Watched/favorite marks are stored relative to your NyRun folder, so you can move the whole library to another disk without losing them.
 - **Durations** show up if [`ffprobe`](https://ffmpeg.org/) (part of ffmpeg) is installed. Optional.
-- **Remembering where you stopped inside a film** is VLC's job: in VLC go to *Tools > Preferences > Interface > Playlist and Instances* and set *Continue playback?* to *Always* or *Ask*.
-- Pressing play marks the item watched or listened (you can turn it off by setting `"auto_watched": false` in `config.json`). Toggle with `w` any time.
+- **Watch progress:** while a film plays, NyRun asks VLC how far you are (a control port on `127.0.0.1` that only exists while that VLC runs). A film or episode is marked watched once you pass 90% (change it in Settings > Watching), a half-watched one shows `▶ 52%`, shows up in *Continue*, and resumes where you stopped. Quitting NyRun never stops the movie, you just lose tracking until you start it again from NyRun. If your VLC has no `rc` interface, nothing is marked automatically; press `w`, or turn *Track how much I watched* off.
+- Albums are marked as listened when you press play (Settings: *Mark albums as listened when I press play*). Toggle any item with `w`.
 - A movie folder with several videos plays the biggest one (so trailers/extras are skipped). Put multi-part films in a single file or use Series.
 - Environment variable `NYRUN_VLC` overrides the VLC path.
 - VLC's own error output from the last launch is kept in `~/.cache/nyrun/vlc-last.log`.

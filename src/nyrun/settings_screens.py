@@ -158,6 +158,7 @@ ONE_INSTANCE = [("VLC default", "default"), ("Reuse one VLC window", "on"), ("Al
 CONTINUE = [("VLC default", "default"), ("Never resume", "never"), ("Ask me", "ask"), ("Always resume where I stopped", "always")]
 
 LOGO_LINE = [("Rainbow (RGB)", "rainbow"), ("Match my theme (follows Omarchy too)", "theme")]
+WATCHED_AT = [(f"{n}% of it", str(n)) for n in (50, 70, 80, 90, 95, 100)]
 MUSIC_LOOP = [("Off", "off"), ("Repeat the album", "all"), ("Repeat one track", "track")]
 
 PRESETS: dict[str, tuple[str, dict]] = {
@@ -172,7 +173,6 @@ PRESET_FIELDS = ["vlc_hwdec", "vlc_vout", "vlc_aout", "vlc_qt_platform", "vlc_ti
 SWITCHES = [
     ("fullscreen", "Start in fullscreen", ""),
     ("vlc_play_and_exit", "Close VLC when playback ends", "Off = VLC stays open after the last file"),
-    ("auto_watched", "Mark as watched when I press play", "NyRun can't see how far you got, so this marks on start"),
     ("vlc_title_osd", "Show the file name on screen at start", ""),
     ("vlc_quiet", "Quiet start", "No first-run privacy prompt, don't keep VLC's recent-files list"),
     ("vlc_loop", "Loop the queue", ""),
@@ -239,6 +239,22 @@ class SettingsScreen(Screen):
             yield from self._row("Extra VLC options", Input(shlex.join(s.extra_vlc_args), placeholder="anything else, e.g. --deinterlace=1 --gain=2", id="f-extra_vlc_args"),
                                  "Passed to VLC exactly as typed.")
 
+            yield Label("Watching", classes="st-h")
+            yield from self._row(
+                "Track how much I watched", Switch(s.track_progress, id="f-track_progress"),
+                "NyRun asks VLC how far you are (a local, VLC-only connection). A film is marked watched only "
+                "when you get far enough, and 'Continue' shows ones you left half-way. "
+                "Off: nothing is marked automatically - use w.",
+            )
+            yield from self._row(
+                "Count as watched after",
+                Select(WATCHED_AT, value=str(s.watched_at) if str(s.watched_at) in dict((v, 1) for _, v in WATCHED_AT) else "90",
+                       allow_blank=False, id="f-watched_at"),
+                "Credits roll for a while, so 90% is a good 'finished'.",
+            )
+            yield from self._row("Resume where I stopped", Switch(s.resume, id="f-resume"),
+                                 "Playing a half-watched film starts it again from your last position.")
+
             yield Label("Music", classes="st-h")
             yield from self._row(
                 "Control music from NyRun", Switch(s.music_controls, id="f-music_controls"),
@@ -248,6 +264,7 @@ class SettingsScreen(Screen):
             yield from self._row("Repeat", Select(MUSIC_LOOP, value=s.music_loop if s.music_loop in ("off", "all", "track") else "off",
                                                   allow_blank=False, id="f-music_loop"))
             yield from self._row("Shuffle", Switch(s.music_shuffle, id="f-music_shuffle"))
+            yield from self._row("Mark albums as listened when I press play", Switch(s.auto_watched, id="f-auto_watched"))
 
             yield Label("What NyRun will run", classes="st-h")
             yield Static(id="st-preview")
@@ -314,7 +331,10 @@ class SettingsScreen(Screen):
                 self._apply_preset(str(event.value))
             return
         if sid.startswith("f-") and event.value is not Select.NULL:
-            self._set(sid[2:], str(event.value))
+            if sid == "f-watched_at":
+                self._set("watched_at", int(str(event.value)))
+            else:
+                self._set(sid[2:], str(event.value))
 
     def on_input_changed(self, event: Input.Changed) -> None:
         iid = event.input.id or ""
@@ -351,7 +371,7 @@ class SettingsScreen(Screen):
                     continue
                 attr = wid[2:]
                 val = shlex.join(s.extra_vlc_args) if attr == "extra_vlc_args" else getattr(s, attr)
-                w.value = val
+                w.value = str(val) if attr == "watched_at" else val
             preset = self.query_one("#st-preset", Select)
             preset.value = Select.NULL
         finally:

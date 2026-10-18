@@ -705,7 +705,7 @@ def test_add_wizard_image_is_optional_and_validated(library, isolated_env):
 
 def test_tiles_appear_only_when_there_is_something(library, fake_music_vlc):
     async def go():
-        app = make_app(library, auto_watched=False)
+        app = make_app(library)
         async with app.run_test(size=SIZE) as pilot:
             await pilot.pause(0.4)
             home = app.screen
@@ -734,19 +734,5 @@ def test_tiles_appear_only_when_there_is_something(library, fake_music_vlc):
             await pilot.press("x")
             await pilot.pause(1.3)
             assert not home.query_one("#tile-nowplaying").display
-
-    run(go())
-
-
-def test_finished_film_is_not_offered_for_continue(library, fake_vlc):
-    async def go():
-        app = make_app(library)  # auto_watched on: pressing play marks it done
-        async with app.run_test(size=SIZE) as pilot:
-            await pilot.press("1", "enter")
-            await pilot.pause(0.4)
-            await pilot.press("escape")
-            await pilot.pause(0.4)
-            assert not app.screen.query_one("#tile-continue").display
-            assert app.continue_target() is None
 
     run(go())

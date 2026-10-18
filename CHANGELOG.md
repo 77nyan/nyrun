@@ -1,7 +1,11 @@
 # Changelog
 
-## 1.3.2
-- The *Continue* and *Now playing* tiles now only show when there is something to resume (an unfinished series or film) or music has been started.
+## 1.4.0
+- **Real watch progress.** NyRun now asks VLC how far you are (through a local, VLC-only control port), so pressing play no longer marks a film as watched. A film or episode counts as watched once you get past 90% (a setting: 50-100%).
+- **Resume where you stopped.** Half-watched films show `▶ 52%` on the poster and in the details; playing them again jumps back to your last position. *Continue* offers the film or episode you left half-way instead of skipping ahead.
+- New *Watching* section in Settings: track progress, the "watched after" percentage, resume. Turning tracking off means nothing is marked automatically (press `w`).
+- *Add a file*: removed the little file icon in front of file names in the picker.
+- Albums are still marked as listened when you press play (Settings: *Mark albums as listened when I press play*).
 
 ## 1.3.2
 - Home: *Continue* only shows when there is something to resume (a series with an episode left, or a film you started and did not mark finished); *Now playing* only shows once you have played music this session.

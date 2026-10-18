@@ -28,6 +28,7 @@ from textual.widgets import (
 from textual.widgets.option_list import Option
 
 from .config import CATEGORIES, IMAGE_EXTS
+from .music import mmss
 from .library import (
     SORT_MODES,
     ImportError_,
@@ -399,7 +400,7 @@ class LibraryScreen(Screen):
                 for it in chunk[r : r + cols]:
                     done, total = self.app.progress(it)
                     cards.append(
-                        PosterCard(it, pc, pr, badge_for(it, done, total, it.key in self.app.state.favorites))
+                        PosterCard(it, pc, pr, badge_for(it, done, total, it.key in self.app.state.favorites, self.app.state.percent(it.key) if not it.is_music else None))
                     )
                 self.cards.extend(cards)
                 rows_w.append(Horizontal(*cards, classes="card-row"))
@@ -451,6 +452,10 @@ class LibraryScreen(Screen):
             t.append(bar(done / total if total else 0, 20) + "\n", style="bold")
         elif done:
             t.append("✓ listened\n" if item.is_music else "✓ watched\n", style="bold green")
+        elif not item.is_music and app.state.percent(item.key):
+            pct = app.state.percent(item.key)
+            t.append(f"▶ {pct}% watched · resume at {mmss(app.state.positions[item.key][0])}\n", style="bold yellow")
+            t.append(bar(pct / 100, 20) + "\n", style="bold")
         if item.key in app.state.favorites:
             t.append("♥ favorite\n", style="bold #ff6b9d")
         plays = app.state.play_count.get(item.key, 0)
@@ -548,6 +553,8 @@ class LibraryScreen(Screen):
             app.state.watched.discard(ep.key) if not new_value else app.state.watched.add(ep.key)
         if not it.is_collection:
             (app.state.watched.add if new_value else app.state.watched.discard)(it.key)
+        for k in [e.key for e in it.episodes] + [it.key]:
+            app.state.positions.pop(k, None)  # marked by hand: forget any half-way point
         app.state.save()
         self.app.notify(f"{'Marked watched' if new_value else 'Marked unwatched'}: {it.title}", markup=False)
         self._reload()
@@ -649,6 +656,9 @@ class EpisodeScreen(Screen):
             line.append("✓ " if seen else "  ", style="bold green" if seen else "")
             line.append(f"{n + 1:>3}  ", style="dim")
             line.append(ep.label, style="dim" if seen else "")
+            pct = None if seen else app.state.percent(ep.key)
+            if pct:
+                line.append(f"   ▶ {pct}%", style="bold yellow")
             opts.append(Option(line, id=ep.key))
         ol.add_options(opts)
         ol.highlighted = max(0, min(highlight, len(opts) - 1))
@@ -675,7 +685,7 @@ class EpisodeScreen(Screen):
         i = ol.highlighted
         if i is None:
             return
-        self.app.state.toggle_watched(self.item.episodes[i].key)
+        self.app.state.toggle_watched(self.item.episodes[i].key)  # also forgets its half-way point
         self._fill(i)
 
     def action_next_unwatched(self) -> None:
@@ -691,6 +701,8 @@ class EpisodeScreen(Screen):
 
 class VisibleTree(DirectoryTree):
     """Directory tree without hidden files, with ←/→ to collapse/expand."""
+
+    ICON_FILE = ""  # no little file glyph in front of file names
 
     BINDINGS = [
         Binding("right", "expand_node", "Open folder", show=False),
