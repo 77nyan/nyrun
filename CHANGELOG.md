@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.0
+- Requires Python 3.12+ (the poster library needs it).
+- `install.sh`: a small menu to install, update or uninstall NyRun (sets up pipx if needed, checks for VLC, never touches your library).
+
 ## 1.2.0
 - **Add a file**: guided flow (`a` on Home, tile, or `nyrun -add [FILE]`) - pick a file, choose the category, name it, optional poster image; NyRun creates the folder and puts both inside.
 - New **Music** category: `Music/` folder (created by `-createfolder`), albums with covers in the library grid, import support (NyRun picks Music for audio files).

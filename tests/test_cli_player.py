@@ -162,3 +162,30 @@ def test_cli_import_copy_and_errors(library, isolated_env):
     assert cli.main(["-import", str(v), "-to", "Shows", "-copy"]) == 0 and v.exists()
     assert cli.main(["-import", str(v), "-to", "Nope"]) == 1
     assert cli.main(["-import", str(isolated_env / "missing.mkv")]) == 1
+
+
+def test_install_script_runs_the_right_pipx_commands(tmp_path):
+    import os, shutil, stat, subprocess
+    from pathlib import Path as P
+
+    script = P(__file__).resolve().parent.parent / "install.sh"
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    log = tmp_path / "pipx.log"
+    for name, body in {
+        "pipx": f'#!/bin/sh\necho "pipx $*" >> {log}\n',
+        "nyrun": '#!/bin/sh\necho "nyrun 9.9.9"\n',
+    }.items():
+        f = bindir / name
+        f.write_text(body)
+        f.chmod(f.stat().st_mode | stat.S_IEXEC)
+    env = dict(os.environ, PATH=f"{bindir}:{os.environ['PATH']}", HOME=str(tmp_path), XDG_CONFIG_HOME=str(tmp_path / "c"))
+    for action in ("install", "update"):
+        r = subprocess.run(["bash", str(script), action], env=env, capture_output=True, text=True, input="")
+        assert r.returncode == 0, r.stdout + r.stderr
+    lines = log.read_text().splitlines()
+    assert lines and all(l.startswith("pipx install --force ") for l in lines)
+    r = subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True, input="4\n")
+    assert r.returncode == 0 and "Install" in r.stdout and "Quit" in r.stdout
+    r = subprocess.run(["bash", str(script), "uninstall"], env=env, capture_output=True, text=True, input="n\n")
+    assert "pipx uninstall nyrun" in log.read_text()

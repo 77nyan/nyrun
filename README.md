@@ -41,6 +41,15 @@ pipx install git+https://github.com/77nyan/nyrun    # straight from GitHub
 pipx install nyrun                                   # once it is on PyPI
 ```
 
+**Installer script** (install / update / uninstall menu):
+
+```bash
+git clone https://github.com/77nyan/nyrun && cd nyrun
+./install.sh
+```
+
+Run `./install.sh` again any time and pick *Update* to get the newest version, or *Uninstall* to remove it (your library is never touched).
+
 From a local copy:
 
 ```bash
