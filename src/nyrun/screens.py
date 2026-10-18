@@ -179,16 +179,12 @@ class HomeScreen(Screen):
                 )
             )
         cont = app.continue_target()
+        tile = self.query_one("#tile-continue", Tile)
+        tile.display = cont is not None  # only offered when there is something to resume
         if cont:
             item, idx = cont
-            label = item.episodes[idx].label
-            self.query_one("#tile-continue", Tile).update(
-                tile_text("Continue", [item.title[:20], label[:20]])
-            )
-        else:
-            self.query_one("#tile-continue", Tile).update(
-                tile_text("Continue", ["nothing to resume", "start a series!"], dim=True)
-            )
+            label = item.episodes[idx].label if item.is_collection else "pick up the film"
+            tile.update(tile_text("Continue", [item.title[:18], label[:18]]))
         self._draw_nowplaying()
         self.query_one("#tile-add", Tile).update(tile_text("Add a file", ["pick a file, name", "it, add a poster"]))
         self.query_one("#tile-import", Tile).update(
@@ -214,11 +210,10 @@ class HomeScreen(Screen):
     def _draw_nowplaying(self) -> None:
         music = self.app.music
         tile = self.query_one("#tile-nowplaying", Tile)
+        tile.display = music is not None  # only after you have started some music
         if music is not None:
             icon = {"playing": "▶", "paused": "❚❚"}.get(music.state, "■")
             tile.update(tile_text("Now playing", [f"{icon} {music.current.title[:15]}", music.item.title[:18]]))
-        else:
-            tile.update(tile_text("Now playing", ["nothing playing", "open Music (4)"], dim=True))
 
     def on_tile_pressed(self, event: Tile.Pressed) -> None:
         tid = event.tile.id or ""
@@ -241,7 +236,7 @@ class HomeScreen(Screen):
     def action_continue_watching(self) -> None:
         cont = self.app.continue_target()
         if not cont:
-            self.app.notify("Nothing to continue yet - play a series episode first.", severity="warning")
+            self.app.notify("Nothing to continue yet - play a series episode or a film first.", severity="warning")
             return
         item, idx = cont
         self.app.play(item, idx)

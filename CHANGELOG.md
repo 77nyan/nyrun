@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.2
+- The *Continue* and *Now playing* tiles now only show when there is something to resume (an unfinished series or film) or music has been started.
+
+## 1.3.2
+- Home: *Continue* only shows when there is something to resume (a series with an episode left, or a film you started and did not mark finished); *Now playing* only shows once you have played music this session.
+- README: removed the Development section.
+
 ## 1.3.1
 - install.sh: install/update now remove the old copy first, which fixes "virtual environment already exists" on pipx versions that use uv.
 

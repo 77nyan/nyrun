@@ -699,3 +699,54 @@ def test_add_wizard_image_is_optional_and_validated(library, isolated_env):
     run(go())
     assert (library / "Series" / "Some Show" / "Show.S01E01.mkv").exists()
     assert (dl / "Show.S01E01.mkv").exists()
+
+
+# ------------------------------------------- Continue / Now playing only when relevant
+
+def test_tiles_appear_only_when_there_is_something(library, fake_music_vlc):
+    async def go():
+        app = make_app(library, auto_watched=False)
+        async with app.run_test(size=SIZE) as pilot:
+            await pilot.pause(0.4)
+            home = app.screen
+            assert not home.query_one("#tile-continue").display
+            assert not home.query_one("#tile-nowplaying").display
+            await pilot.press("c", "n")  # keys do nothing but explain
+            await pilot.pause(0.2)
+            assert isinstance(app.screen, HomeScreen)
+            # a film that was started (and not marked finished) can be continued
+            await pilot.press("1", "enter")
+            await pilot.pause(0.4)
+            await pilot.press("escape")
+            await pilot.pause(0.4)
+            assert home.query_one("#tile-continue").display
+            assert "Alien" in str(home.query_one("#tile-continue").render())
+            assert not home.query_one("#tile-nowplaying").display
+            # once music has been played, Now playing shows up
+            await pilot.press("4", "enter")
+            assert await settle(pilot, lambda: isinstance(app.screen, NowPlayingScreen))
+            await pilot.press("escape", "escape")
+            await pilot.pause(1.2)
+            assert home.query_one("#tile-nowplaying").display
+            # stopping music hides it again
+            await pilot.press("n")
+            await pilot.pause(0.5)
+            await pilot.press("x")
+            await pilot.pause(1.3)
+            assert not home.query_one("#tile-nowplaying").display
+
+    run(go())
+
+
+def test_finished_film_is_not_offered_for_continue(library, fake_vlc):
+    async def go():
+        app = make_app(library)  # auto_watched on: pressing play marks it done
+        async with app.run_test(size=SIZE) as pilot:
+            await pilot.press("1", "enter")
+            await pilot.pause(0.4)
+            await pilot.press("escape")
+            await pilot.pause(0.4)
+            assert not app.screen.query_one("#tile-continue").display
+            assert app.continue_target() is None
+
+    run(go())

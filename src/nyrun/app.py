@@ -173,20 +173,25 @@ class NyRunApp(ThemedApp):
         return 0
 
     def continue_target(self) -> tuple[Item, int] | None:
-        """Most recently played series/show that still has something to watch."""
-        candidates = [
-            i
-            for cat in CATEGORIES
-            for i in self.library.get(cat, [])
-            if i.is_collection and i.key in self.state.last_played
-        ]
-        candidates.sort(key=lambda i: -self.state.last_played[i.key])
-        for item in candidates:
-            last = self.state.last_episode.get(item.key)
-            keys = [e.key for e in item.episodes]
-            if last in keys and keys.index(last) + 1 < len(keys):
-                return item, keys.index(last) + 1
-        return None
+        """What 'Continue' should resume: the most recently played series/show that still has
+        an episode left, or a film you started but have not marked as finished."""
+        found: list[tuple[float, Item, int]] = []
+        for cat in CATEGORIES:
+            for item in self.library.get(cat, []):
+                played = self.state.last_played.get(item.key)
+                if not played or item.is_music:
+                    continue
+                if item.is_collection:
+                    last = self.state.last_episode.get(item.key)
+                    keys = [e.key for e in item.episodes]
+                    if last in keys and keys.index(last) + 1 < len(keys):
+                        found.append((played, item, keys.index(last) + 1))
+                elif item.key not in self.state.watched:
+                    found.append((played, item, 0))
+        if not found:
+            return None
+        _, item, idx = max(found, key=lambda f: f[0])
+        return item, idx
 
     # ----- music -----
     def play_music(self, item: Item, start: int = 0) -> None:

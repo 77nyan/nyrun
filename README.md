@@ -22,7 +22,7 @@ your files stay exactly where they are, and your posters are just image files.
 - **Music player** with a **spinning vinyl record** drawn in pixels, with the album cover as its label (see [Music](#music))
 - **Add a file** (`a`, or `nyrun -add`): a guided 5-step flow. Pick a video, choose Movies / Series / Shows / Music, type the name, optionally give it a poster image, move or copy. NyRun creates the folder with that name and puts the file and the image inside
 - **Import screen**: **move / copy from Downloads or any directory**. Highlight a film, a show, a song or a folder and **move (cut) or copy** it into your library. NyRun picks Music for audio automatically. A lone file gets its own folder and its subtitles and poster come along
-- **Continue watching**: jumps to your next unwatched episode, and the rest of the season is queued in VLC
+- **Continue watching** (only shown when there is something to resume): jumps to your next unwatched episode, and the rest of the season is queued in VLC
 - **Watched** and **favorite** marks, **search**, **sort** (name / added / last played / year / size) and **views** (all / unwatched / watched / favorites)
 - **Matches your Omarchy theme** and follows it live: switch themes in Omarchy and NyRun recolours itself within a couple of seconds
 - **Theme picker** (`nyrun -theme`) with live preview, 16 built-in themes, your own themes, or your terminal's own colours
@@ -238,17 +238,6 @@ Using the Flatpak VLC? It cannot see folders outside your home until you allow i
 | Drive unplugged | NyRun tells you the folder is missing. Reconnect it, or `nyrun -default NEWPATH` |
 
 `nyrun -doctor` checks most of this for you.
-
-## Development
-
-```bash
-git clone https://github.com/77nyan/nyrun && cd nyrun
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-pytest
-```
-
-The test-suite drives the real TUI headlessly with simulated key presses and a fake "VLC".
 
 ## License
 
