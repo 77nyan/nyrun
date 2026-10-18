@@ -170,3 +170,44 @@ def test_marking_by_hand_forgets_the_halfway_point(library):
 
 def test_add_tree_has_no_file_icon(library):
     assert VisibleTree.ICON_FILE == ""
+
+
+def test_vlc_that_rejects_tracking_options_still_plays(library, tmp_path, monkeypatch):
+    """Real-world bug: a VLC without --rc-quiet exited with 'unknown option'. NyRun must retry plain."""
+    import stat
+
+    log = tmp_path / "calls.log"
+    script = tmp_path / "picky-vlc"
+    script.write_text(
+        '#!/bin/sh\nprintf "%s\\n" "$*" >> "' + str(log) + '"\n'
+        'case "$*" in *--rc-host*) echo "vlc: unknown option or missing mandatory argument \\`--rc-host\'" >&2; exit 1;; esac\n'
+    )
+    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    monkeypatch.setenv("NYRUN_VLC", str(script))
+    seen = []
+
+    async def go():
+        app = make_app(library)
+        orig = app.notify
+        app.notify = lambda msg, **kw: (seen.append((str(msg), kw.get("severity"))), orig(msg, **kw))[1]
+        async with app.run_test(size=SIZE) as pilot:
+            await pilot.pause(0.3)
+            app.play(movie(app))
+            assert await wait_for(pilot, lambda: any(sev == "warning" for _, sev in seen), timeout=12)
+            assert app._no_tracking
+            app.play(movie(app))  # the next time it does not even try tracking
+            await pilot.pause(0.6)
+
+    asyncio.run(go())
+    lines = log.read_text().splitlines()
+    assert "--rc-host" in lines[0] and "--rc-host" not in lines[1]
+    assert "--rc-host" not in lines[2]
+    assert not any(sev == "error" for _, sev in seen)
+
+
+def test_tracking_options_are_ones_vlc_3_knows():
+    from nyrun import player
+
+    args = player.watch_args(1234, Settings())
+    assert args[:2] == ["--extraintf=rc", "--rc-host=127.0.0.1:1234"]
+    assert "--rc-quiet" not in args

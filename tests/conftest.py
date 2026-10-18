@@ -144,7 +144,7 @@ def pos():
     return min(stop, offset + (time.time() - t0) * speed)
 reached = None
 while True:
-    if pos() >= stop:
+    if pos() >= stop:  # the "user" quit here; linger briefly so a slow poller still sees the final position
         reached = reached or time.time()
         if time.time() - reached > 1.5:
             break

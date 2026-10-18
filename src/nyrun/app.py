@@ -131,6 +131,7 @@ class NyRunApp(ThemedApp):
         self.root: Path = settings.root or Path.home() / "NyRun"
         self.state = state or State()
         self._last_save = 0.0
+        self._no_tracking = False  # set if this VLC rejects the tracking options
         self.library: dict[str, list[Item]] = {c: [] for c in CATEGORIES}
         self.music: MusicSession | None = None
         self.open_add: Path | str | None = None  # set by `nyrun -add [FILE]`
@@ -262,7 +263,7 @@ class NyRunApp(ThemedApp):
         if missing:
             self.notify(f"File is missing: {missing[0].name}. Is the drive connected?", severity="error", markup=False)
             return
-        tracking = self.settings.track_progress
+        tracking = self.settings.track_progress and not self._no_tracking
         port = free_port() if tracking else None
         try:
             proc = launch(files, self.settings, port)
@@ -272,7 +273,7 @@ class NyRunApp(ThemedApp):
         except OSError as e:
             self.notify(f"Could not start VLC: {e}", severity="error", timeout=12, markup=False)
             return
-        self._watch_vlc(proc)
+        self._watch_vlc(proc, files, bool(port))
         if self.music is not None and self.music.state == "playing":
             self.music.toggle_pause()  # don't talk over the film
         first = eps[0]
@@ -311,7 +312,7 @@ class NyRunApp(ThemedApp):
             st.save()
 
     @work(thread=True, group="vlc-watch")
-    def _watch_vlc(self, proc: subprocess.Popen) -> None:
+    def _watch_vlc(self, proc: subprocess.Popen, files: list[Path] | None = None, tracked: bool = False) -> None:
         """If VLC dies within a few seconds, tell the user why (usually a bad setting)."""
         try:
             code = proc.wait(timeout=4)
@@ -319,6 +320,28 @@ class NyRunApp(ThemedApp):
             return  # still running = it started fine
         if code != 0:
             detail = last_error_lines() or "no output"
+            low = detail.lower()
+            if tracked and files and ("rc-" in low or "extraintf" in low):
+                # this VLC does not understand the progress-tracking options: play without them
+                self._no_tracking = True
+                try:
+                    again = launch(files, self.settings)
+                except (OSError, VLCNotFound):
+                    again = None
+                if again is not None:
+                    try:
+                        code = again.wait(timeout=4)
+                    except subprocess.TimeoutExpired:
+                        code = 0
+                    if code == 0:
+                        self.call_from_thread(
+                            self.notify,
+                            "Your VLC does not support progress tracking, so it is switched off for now.\n"
+                            "The film is playing; use w to mark it watched.",
+                            severity="warning", timeout=10, markup=False,
+                        )
+                        return
+                    detail = last_error_lines() or "no output"
             self.call_from_thread(
                 self.notify,
                 f"VLC exited with code {code}: {detail}\nTry Settings (,) > VLC preset > Default.",

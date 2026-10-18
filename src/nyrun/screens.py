@@ -43,6 +43,7 @@ from .library import (
 )
 from .widgets import (
     PosterCard,
+    _cell_px,
     Rainbow,
     Tile,
     badge_for,
@@ -119,7 +120,6 @@ class HomeScreen(Screen):
                 yield Tile("tile-add", classes="-action")
                 yield Tile("tile-import", classes="-action")
                 yield Tile("tile-settings", classes="-action")
-            yield Static(id="empty-hint")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -198,16 +198,6 @@ class HomeScreen(Screen):
         self.query_one("#tagline", Static).update(
             f"{total_items} titles · {human_size(total_size)} · {frac_all}% watched · {_tilde(app.root)}"
         )
-        hint = self.query_one("#empty-hint", Static)
-        if total_items == 0:
-            hint.update(
-                "Your library is empty.\n"
-                f"Press [b]i[/b] to import, or drop a folder per film (video + poster.jpg) or album into\n"
-                f"{app.root / 'Movies'}"
-            )
-        else:
-            hint.update("")
-
     def _draw_nowplaying(self) -> None:
         music = self.app.music
         tile = self.query_one("#tile-nowplaying", Tile)
@@ -293,7 +283,7 @@ class LibraryScreen(Screen):
         self._geom: tuple[int, int, int, int] = (0, 0, 0, 0)  # cols, rows, poster cols, poster rows
         self.cards: list[PosterCard] = []
         self._durations: dict[str, float | None] = {}
-        self._detail_dims = (24, 18)
+        self._detail_dims = (14, 7)
 
     # ----- composition -----
     def compose(self) -> ComposeResult:
@@ -307,7 +297,7 @@ class LibraryScreen(Screen):
                 yield Vertical(id="grid")
             with Vertical(id="detail"):
                 with Vertical(id="detail-poster-box"):
-                    yield make_poster(None, 24, 18, id="detail-poster")
+                    yield make_poster(None, 14, 7, id="detail-poster")
                 yield Label(id="detail-title", markup=False)
                 yield Static(id="detail-info")
         yield Footer()
@@ -359,9 +349,10 @@ class LibraryScreen(Screen):
         square = self.category == "Music"  # album covers are square; film posters are portrait
         pc = pr * 2 if square else pr * 4 // 3
         cols = max(1, w // (pc + 3))
-        # detail poster follows the screen height
-        dr = 18 if self.size.height >= 38 else max(6, self.size.height - 20)
-        dims = (min(dr * 2, 34), dr) if square else (dr * 4 // 3, dr)
+        # the details picture: a small square in real pixels (a cell is roughly twice as tall as wide)
+        dr = 7 if self.size.height >= 38 else max(4, self.size.height - 30)
+        cw, ch = _cell_px()
+        dims = (min(28, max(dr, round(dr * ch / cw))), dr)
         if dims != self._detail_dims:
             self._detail_dims = dims
             self._update_detail()
@@ -428,6 +419,7 @@ class LibraryScreen(Screen):
         item = self.current
         dc, dr = self._detail_dims
         set_poster(self.query_one("#detail-poster"), item, dc, dr)
+        self.query_one("#detail-poster-box").styles.height = dr  # never taller than the picture should be
         self.query_one("#detail-title", Label).update(item.title if item else "")
         info = self.query_one("#detail-info", Static)
         if not item:

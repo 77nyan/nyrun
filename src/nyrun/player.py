@@ -183,7 +183,7 @@ def log_path() -> Path:
 
 def watch_args(port: int, s: Settings) -> list[str]:
     """Options that let NyRun ask this VLC how far along it is (see watch.py)."""
-    a = ["--extraintf=rc", f"--rc-host=127.0.0.1:{port}", "--rc-quiet"]
+    a = ["--extraintf=rc", f"--rc-host=127.0.0.1:{port}"]
     if s.vlc_one_instance != "on":
         a.append("--no-one-instance")  # a hand-off to a running VLC would never answer us
     return a

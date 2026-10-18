@@ -20,7 +20,6 @@ Screen { background: $background; }
 .tile.-action { width: 20; height: 6; margin: 0 1; }
 .tile:hover { border: round $primary; }
 .tile:focus { border: heavy $accent; background: $boost; }
-#empty-hint { width: 90; height: auto; color: $warning; text-align: center; margin-top: 1; }
 
 /* ---------- library ---------- */
 #lib-body { height: 1fr; }

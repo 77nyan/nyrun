@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.2
+- Fixed: VLC refused to start with `unknown option --rc-quiet` (1.4.0 / 1.4.1), so films would not play. If a VLC ever rejects the progress-tracking options, NyRun now plays the film without tracking instead of failing.
+- The picture in the details panel is smaller and really square.
+- Removed the "Your library is empty" message from the home screen.
+
 ## 1.4.0
 - **Real watch progress.** NyRun now asks VLC how far you are (through a local, VLC-only control port), so pressing play no longer marks a film as watched. A film or episode counts as watched once you get past 90% (a setting: 50-100%).
 - **Resume where you stopped.** Half-watched films show `▶ 52%` on the poster and in the details; playing them again jumps back to your last position. *Continue* offers the film or episode you left half-way instead of skipping ahead.
