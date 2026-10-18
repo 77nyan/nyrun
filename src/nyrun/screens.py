@@ -154,7 +154,7 @@ class HomeScreen(Screen):
         total_items = total_size = done = eps = 0
         for cat in CATEGORIES:
             items = app.library.get(cat, [])
-            d = sum(app.progress(i)[0] for i in items)
+            d = sum(app.progress_units(i) for i in items)
             n = sum(app.progress(i)[1] for i in items)
             if cat == "Music":
                 d = n = 0  # music has no "watched" percentage in the overall tagline

@@ -17,6 +17,8 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.setenv("USERPROFILE", str(home))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))  # else a real Omarchy install leaks in
+    monkeypatch.delenv("NYRUN_OMARCHY_DIR", raising=False)
     monkeypatch.delenv("NYRUN_VLC", raising=False)
     return home
 

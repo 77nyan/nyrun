@@ -211,3 +211,44 @@ def test_tracking_options_are_ones_vlc_3_knows():
     args = player.watch_args(1234, Settings())
     assert args[:2] == ["--extraintf=rc", "--rc-host=127.0.0.1:1234"]
     assert "--rc-quiet" not in args
+
+
+def _tile_text(app, cat: str) -> str:
+    from nyrun.screens import HomeScreen
+
+    home = next(s for s in app.screen_stack if isinstance(s, HomeScreen))
+    return str(home.query_one(f"#tile-{cat}").render())
+
+
+def test_progress_units_count_part_watched_films(library):
+    app = make_app(library)
+    film = movie(app)
+    assert app.progress_units(film) == 0
+    app.state.set_position(ALIEN, 74, 100)
+    assert abs(app.progress_units(film) - 0.74) < 0.001
+    app.state.set_watched(ALIEN, True)
+    assert app.progress_units(film) == 1
+
+
+def test_home_category_percentage_follows_part_watched_film(tmp_path):
+    from conftest import make_poster
+
+    root = tmp_path / "NyRun"
+    for cat in ("Movies", "Series", "Shows", "Music"):
+        (root / cat).mkdir(parents=True)
+    d = root / "Movies" / "Alien (1979)"
+    d.mkdir()
+    (d / "film.mp4").write_bytes(b"0" * 2048)
+    make_poster(d / "poster.jpg")
+
+    async def go():
+        app = make_app(root)
+        async with app.run_test(size=SIZE) as pilot:
+            await pilot.pause(0.3)
+            assert "0%" in _tile_text(app, "Movies")
+            app.state.set_position(ALIEN, 74, 100)
+            app.screen._draw_tiles()
+            await pilot.pause(0.1)
+            assert "74%" in _tile_text(app, "Movies")
+
+    asyncio.run(go())

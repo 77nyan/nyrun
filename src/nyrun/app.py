@@ -162,6 +162,21 @@ class NyRunApp(ThemedApp):
             return done, len(item.episodes)
         return (1 if item.key in self.state.watched else 0), 1
 
+    def progress_units(self, item: Item) -> float:
+        """Like progress()[0], but a film/episode you are part-way through counts for the
+        fraction you got through (a film stopped at 74% is 0.74), so the home screen's
+        category percentages move as you watch, not only when something is finished."""
+
+        def unit(key: str) -> float:
+            if key in self.state.watched:
+                return 1.0
+            pct = self.state.percent(key)
+            return pct / 100 if pct else 0.0
+
+        if item.is_collection:
+            return sum(unit(e.key) for e in item.episodes)
+        return unit(item.key)
+
     def next_episode_index(self, item: Item) -> int:
         """Where 'continue' should start: the first episode after the last one
         you played, else the first unwatched one, else the beginning."""

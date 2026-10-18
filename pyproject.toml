@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nyrun"
-version = "1.4.2"
+version = "1.4.3"
 description = "NyRun - a cozy poster-based TUI video and music selector that launches your films, shows and albums in VLC."
 readme = "README.md"
 requires-python = ">=3.12"

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.3
+- Home: the percentage under Movies / Series / Shows (and the overall "% watched") now counts part-watched films and episodes. One film stopped at 74% shows 74% instead of 0%.
+
 ## 1.4.2
 - Fixed: VLC refused to start with `unknown option --rc-quiet` (1.4.0 / 1.4.1), so films would not play. If a VLC ever rejects the progress-tracking options, NyRun now plays the film without tracking instead of failing.
 - The picture in the details panel is smaller and really square.
