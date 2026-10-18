@@ -141,8 +141,13 @@ conn.settimeout(0.05)
 t0 = time.time()
 offset = 0.0
 def pos():
-    return offset + (time.time() - t0) * speed
-while pos() < stop:
+    return min(stop, offset + (time.time() - t0) * speed)
+reached = None
+while True:
+    if pos() >= stop:
+        reached = reached or time.time()
+        if time.time() - reached > 1.5:
+            break
     try:
         data = conn.recv(1024)
     except socket.timeout:
