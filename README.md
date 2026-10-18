@@ -34,7 +34,7 @@ your files stay exactly where they are, and your posters are just image files.
 
 ## Install
 
-You need Python 3.10+ and [VLC](https://www.videolan.org/vlc/).
+You need Python 3.12+ and [VLC](https://www.videolan.org/vlc/).
 
 ```bash
 pipx install git+https://github.com/77nyan/nyrun    # straight from GitHub
