@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.3.1
+- install.sh: install/update now remove the old copy first, which fixes "virtual environment already exists" on pipx versions that use uv.
+
 ## 1.3.0
 - Requires Python 3.12+ (the poster library needs it).
 - `install.sh`: a small menu to install, update or uninstall NyRun (sets up pipx if needed, checks for VLC, never touches your library).

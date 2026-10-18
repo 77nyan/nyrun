@@ -49,10 +49,16 @@ check_vlc() {
   fi
 }
 
+# Remove any old copy first: some pipx versions (the uv-based ones) refuse "--force" over an existing install.
+pipx_fresh_install() {
+  pipx uninstall nyrun >/dev/null 2>&1
+  pipx install "$SOURCE"
+}
+
 do_install() {
   need_python && ensure_pipx || return 1
   say "Installing NyRun from $SOURCE_NAME..."
-  pipx install --force "$SOURCE" || { die "Install failed."; return 1; }
+  pipx_fresh_install || { die "Install failed."; return 1; }
   ok "NyRun installed: $(nyrun -version 2>/dev/null || echo 'open a new terminal, then run: nyrun -version')"
   check_vlc
   say "${D}First time? Run:  nyrun -createfolder   then   nyrun${N}"
@@ -66,7 +72,7 @@ do_update() {
     git -C "$HERE" pull --ff-only || warn "git pull did not work - updating from what is in this folder."
   fi
   local before; before="$(nyrun -version 2>/dev/null || echo 'not installed')"
-  pipx install --force "$SOURCE" || { die "Update failed."; return 1; }
+  pipx_fresh_install || { die "Update failed."; return 1; }
   ok "$before  ->  $(nyrun -version 2>/dev/null || echo done)"
 }
 

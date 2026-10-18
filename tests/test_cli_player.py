@@ -184,8 +184,10 @@ def test_install_script_runs_the_right_pipx_commands(tmp_path):
         r = subprocess.run(["bash", str(script), action], env=env, capture_output=True, text=True, input="")
         assert r.returncode == 0, r.stdout + r.stderr
     lines = log.read_text().splitlines()
-    assert lines and all(l.startswith("pipx install --force ") for l in lines)
+    installs = [l for l in lines if l.startswith("pipx install ")]
+    assert len(installs) == 2 and not any("--force" in l for l in installs)
+    assert lines.count("pipx uninstall nyrun") == 2  # old copy removed before each install
     r = subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True, input="4\n")
     assert r.returncode == 0 and "Install" in r.stdout and "Quit" in r.stdout
     r = subprocess.run(["bash", str(script), "uninstall"], env=env, capture_output=True, text=True, input="n\n")
-    assert "pipx uninstall nyrun" in log.read_text()
+    assert log.read_text().count("pipx uninstall nyrun") == 3
