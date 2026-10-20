@@ -384,3 +384,108 @@ def test_cli_help_and_doctor_mention_the_new_things(library, capsys):
     cli.main(["-doctor"])
     doc = capsys.readouterr().out.lower()
     assert "ffmpeg" in doc and "yt-dlp" in doc
+
+
+# ------------------------------------------------------------------ YouTube-style links (relayed through yt-dlp)
+
+def _youtube_resolved():
+    from nyrun.urlengine import Kind
+    from nyrun.urlengine.model import Resolved
+
+    return Resolved("https://www.youtube.com/watch?v=abc", "https://rr1---sn.googlevideo.com/videoplayback?x=1", Kind.FILE,
+                    "yt-dlp", "A YouTube Video", audio_url="https://rr1---sn.googlevideo.com/videoplayback?a=1", via_ytdlp=True)
+
+
+def test_only_youtube_style_links_are_relayed():
+    from nyrun.urlengine import Kind
+    from nyrun.urlengine.model import Resolved
+
+    assert _youtube_resolved().needs_relay
+    other = Resolved("https://vimeo.com/1", "https://cdn.vimeo.com/v.mp4", Kind.FILE, "yt-dlp", "V", via_ytdlp=True)
+    assert not other.needs_relay
+    direct = Resolved("https://youtube.com/x.mp4", "https://youtube.com/x.mp4", Kind.FILE, "direct", "D")
+    assert not direct.needs_relay  # not found by yt-dlp: VLC can open it itself
+
+
+def test_relay_command_formats(monkeypatch):
+    from nyrun.urlengine import Options
+    from nyrun.urlengine import ytdlp
+
+    monkeypatch.setattr(ytdlp, "find_ffmpeg", lambda *_: "/usr/bin/ffmpeg")
+    cmd = ytdlp.relay_command("https://youtu.be/x", Options(quality="720", cookies_browser="firefox"))
+    assert cmd[-2:] == ["--", "https://youtu.be/x"] and ["-o", "-"] == cmd[cmd.index("-o"):cmd.index("-o") + 2]
+    f = cmd[cmd.index("-f") + 1]
+    assert f.startswith("bv*[height<=720]+ba") and "--merge-output-format" in cmd and "mkv" in cmd
+    assert cmd[cmd.index("--cookies-from-browser") + 1] == "firefox"
+    monkeypatch.setattr(ytdlp, "find_ffmpeg", lambda *_: None)
+    plain = ytdlp.relay_command("https://youtu.be/x", Options())
+    assert "+" not in plain[plain.index("-f") + 1] and "--merge-output-format" not in plain
+
+
+def test_youtube_link_is_piped_from_ytdlp_into_vlc(library, tmp_path, monkeypatch):
+    """VLC must get the video on stdin (fd://0), never the raw googlevideo address that YouTube answers with HTTP 429."""
+    out = tmp_path / "vlc.out"
+    vlc = tmp_path / "vlcpipe"
+    vlc.write_text("#!/bin/sh\necho \"ARGS $@\" > %s\ncat >> %s\nsleep 5\n" % (out, out))
+    vlc.chmod(0o755)
+    monkeypatch.setenv("NYRUN_VLC", str(vlc))
+    fake_ytdlp = tmp_path / "yt-dlp"
+    fake_ytdlp.write_text("#!/bin/sh\necho \"$@\" > %s\nprintf 'VIDEODATA'\n" % (tmp_path / "ytdlp.args"))
+    fake_ytdlp.chmod(0o755)
+    monkeypatch.setattr("nyrun.urlengine.ytdlp.ytdlp_binary", lambda: str(fake_ytdlp))
+
+    async def go():
+        app = make_app(library)
+        notes = []
+        orig = app.notify
+        app.notify = lambda msg, **kw: (notes.append(str(msg)), orig(msg, **kw))[1]
+        async with app.run_test(size=SIZE) as pilot:
+            await pilot.pause(0.3)
+            assert app.play_url(_youtube_resolved())
+            assert await wait_for(pilot, lambda: out.exists() and "VIDEODATA" in out.read_text())
+            text = out.read_text()
+            assert "fd://0" in text and "googlevideo" not in text and "--rc-host" not in text
+            assert "https://www.youtube.com/watch?v=abc" in (tmp_path / "ytdlp.args").read_text()
+            assert any("yt-dlp" in n for n in notes)
+            assert app.state.url_history[0]["url"] == "https://www.youtube.com/watch?v=abc"
+
+    asyncio.run(go())
+
+
+def test_vlc_refused_by_the_server_is_explained(library, monkeypatch, tmp_path, web):
+    """VLC that quits with code 0 after 'HTTP 429' used to vanish silently; now the user is told."""
+    script = tmp_path / "vlc429"
+    script.write_text("#!/bin/sh\necho 'access stream error: HTTP 429 error' >&2\nexit 0\n")
+    script.chmod(0o755)
+    monkeypatch.setenv("NYRUN_VLC", str(script))
+    from nyrun.urlengine import Kind
+    from nyrun.urlengine.model import Resolved
+
+    res = Resolved("https://x.example/p", "https://x.example/v.mp4", Kind.FILE, "direct", "V")
+
+    async def go():
+        app = make_app(library)
+        notes = []
+        orig = app.notify
+        app.notify = lambda msg, **kw: (notes.append(str(msg)), orig(msg, **kw))[1]
+        async with app.run_test(size=SIZE) as pilot:
+            await pilot.pause(0.3)
+            app.play_url(res)
+            assert await wait_for(pilot, lambda: any("HTTP 429" in n for n in notes), timeout=10)
+
+    asyncio.run(go())
+
+
+def test_google_drive_and_cookie_links_are_relayed():
+    from nyrun.urlengine import Kind
+    from nyrun.urlengine import ytdlp
+    from nyrun.urlengine.model import Resolved
+
+    drive = Resolved("https://drive.google.com/file/d/abc/view", "https://drive.usercontent.google.com/download?id=abc", Kind.FILE, "yt-dlp", "Clip", via_ytdlp=True)
+    assert drive.needs_relay
+    # any site whose address only works with cookies yt-dlp holds
+    info = {"title": "Cookie site", "url": "https://cdn.example/v.mp4", "protocol": "https", "ext": "mp4", "http_headers": {"Cookie": "a=b", "User-Agent": "UA"}}
+    res = ytdlp.info_to_resolved("https://site.example/watch/1", info)
+    assert res.cookies and res.needs_relay
+    plain = ytdlp.info_to_resolved("https://site.example/watch/2", {"title": "P", "url": "https://cdn.example/v.mp4", "protocol": "https", "ext": "mp4"})
+    assert not plain.cookies and not plain.needs_relay

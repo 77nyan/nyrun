@@ -370,21 +370,46 @@ class NyRunApp(ThemedApp):
                 timeout=15,
                 markup=False,
             )
+        else:
+            low = (last_error_lines(6) or "").lower()
+            m = __import__("re").search(r"http (4\d\d|5\d\d)", low)
+            if m:  # VLC "exits normally" after the server refused it: say so instead of vanishing silently
+                self.call_from_thread(
+                    self.notify,
+                    f"VLC closed right away: the site answered HTTP {m.group(1)}.\n"
+                    "The link may have expired or needs a login. Try again, or set yt-dlp to Always in Settings.",
+                    severity="warning", timeout=14, markup=False,
+                )
 
     def play_url(self, res) -> bool:
         """Open a resolved URL (see nyrun.urlengine) in VLC. Remembers it and tracks progress like a film."""
-        tracking = self.settings.track_progress and not self._no_tracking and not res.is_live
+        relay = res.needs_relay
+        # a relayed video arrives through a pipe: VLC cannot skip around in it, so there is nothing to track or resume
+        tracking = self.settings.track_progress and not self._no_tracking and not res.is_live and not relay
         port = free_port() if tracking else None
-        extra = url_args(res)
-        files = [res.media_url]
+        extra = [f"--meta-title={res.title}"] if relay and res.title else ([] if relay else url_args(res))
+        files = ["fd://0"] if relay else [res.media_url]
+        feeder = None
         try:
-            proc = launch(files, self.settings, port, extra)
+            if relay:
+                feeder = self._start_relay(res)
+            proc = launch(files, self.settings, port, extra, stdin=feeder.stdout if feeder else None)
+            if feeder is not None and feeder.stdout is not None:
+                feeder.stdout.close()  # VLC owns the read end now
         except VLCNotFound as e:
+            self._stop_relay(feeder)
             self.notify(str(e), severity="error", timeout=12, markup=False)
             return False
         except OSError as e:
+            self._stop_relay(feeder)
             self.notify(f"Could not start VLC: {e}", severity="error", timeout=12, markup=False)
             return False
+        if relay:
+            self.notify(
+                "Streaming through yt-dlp: it takes a few seconds to start, and VLC cannot skip around in it.\n"
+                "To skip around, save a copy (Ctrl+D) and play that.",
+                timeout=9, markup=False,
+            )
         self._watch_vlc(proc, files, bool(port), extra)
         if self.music is not None and self.music.state == "playing":
             self.music.toggle_pause()  # don't talk over the video
@@ -399,6 +424,37 @@ class NyRunApp(ThemedApp):
                 resume_at=resume,
             ).start()
         return True
+
+    def _start_relay(self, res) -> subprocess.Popen:
+        """yt-dlp fetches the video and writes it to a pipe that VLC reads."""
+        from .config import cache_dir
+        from .urlengine import Options
+        from .urlengine.ytdlp import relay_command
+
+        cmd = relay_command(res.page_url, Options.from_settings(self.settings))
+        try:
+            cache_dir().mkdir(parents=True, exist_ok=True)
+            err = open(cache_dir() / "ytdlp-last.log", "wb")
+        except OSError:
+            err = subprocess.DEVNULL
+        kwargs: dict = dict(stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=err)
+        if sys.platform.startswith("win"):
+            kwargs["creationflags"] = 0x00000008 | 0x00000200
+        else:
+            kwargs["start_new_session"] = True
+        try:
+            return subprocess.Popen(cmd, **kwargs)
+        finally:
+            if err is not subprocess.DEVNULL:
+                err.close()
+
+    @staticmethod
+    def _stop_relay(feeder) -> None:
+        if feeder is not None:
+            try:
+                feeder.kill()
+            except OSError:
+                pass
 
     def open_in_file_manager(self, path: Path) -> None:
         try:

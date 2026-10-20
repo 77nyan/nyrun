@@ -56,12 +56,26 @@ class Resolved:
     note: str = ""  # one friendly line about how it was found (or why it may fail)
     ext: str = ""  # best guess at the file extension (mp4, mkv, mp3, ...)
     via_ytdlp: bool = False  # yt-dlp resolved it, so yt-dlp can also download it
+    cookies: bool = False  # the address only works with cookies yt-dlp holds (Google Drive...): VLC cannot open it alone
 
     def header(self, name: str) -> str:
         for k, v in self.headers:
             if k.lower() == name.lower():
                 return v
         return ""
+
+    @property
+    def needs_relay(self) -> bool:
+        """Some servers answer VLC with errors (YouTube: HTTP 429/403) or need cookies only yt-dlp has (Google Drive),
+        so yt-dlp has to fetch the video and hand it to VLC."""
+        if not self.via_ytdlp or self.is_live:
+            return False
+        if self.cookies:
+            return True
+        from urllib.parse import urlsplit
+
+        hosts = [(urlsplit(u).hostname or "").lower() for u in (self.media_url, self.page_url)]
+        return any(h.endswith(("googlevideo.com", "youtube.com", "youtu.be", "youtube-nocookie.com", "drive.google.com", "docs.google.com", "drive.usercontent.google.com")) for h in hosts)
 
     @property
     def key(self) -> str:

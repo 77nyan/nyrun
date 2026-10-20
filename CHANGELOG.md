@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.2
+- Fixed: Google Drive links (and any other site whose video address only works with cookies) opened VLC and it closed again. They now go through yt-dlp like YouTube.
+- Tests: ffmpeg is installed on the macOS runners with a prebuilt binary (the Homebrew install was what hung them), and a stuck run now stops after 25 minutes with a per-test log.
+
+## 1.5.1
+- Fixed: YouTube links opened VLC and it closed again at once. YouTube's servers answer VLC with `HTTP 429`. NyRun now lets yt-dlp fetch YouTube videos and feed them to VLC through a pipe (the video and audio are joined on the fly when ffmpeg is installed). Trade-off: VLC cannot skip around in a piped video, and it takes a few seconds to start. For skipping, save a copy (Ctrl+D) and play that.
+- If VLC is refused by a site (HTTP 4xx/5xx) and quits, NyRun now says so instead of closing silently.
+
 ## 1.5.0
 - **Watch from a URL.** New *URL* tile on the home screen (key `u`, or `nyrun -url [LINK]`). Paste a link, press Enter, and it opens in VLC. Links you open are remembered in a *Recent* list (Enter replays one, Delete forgets it). A half-watched link resumes like a film.
 - **The NyRun URL engine** finds the video for you. It tries, in order: the link itself (`.mp4`, `.mkv`, `.m3u8`, `.mpd`, `rtsp://`...), what the server says the link is, a scan of the web page (`og:video`, `<video>`, JSON-LD, stream links hidden in scripts, embedded players), then **yt-dlp** (about a thousand sites), and finally VLC's own web-page scripts. Dead candidates are skipped, redirects are followed, and `Referer` / user-agent are passed on to VLC so protected links still play. HLS streams, DASH and live streams are supported.

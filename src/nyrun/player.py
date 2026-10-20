@@ -205,11 +205,12 @@ def url_args(res) -> list[str]:
     return a
 
 
-def launch(files: list[Path], s: Settings, port: int | None = None, extra: list[str] | None = None) -> subprocess.Popen:
+def launch(files: list[Path], s: Settings, port: int | None = None, extra: list[str] | None = None, stdin=None) -> subprocess.Popen:
     """Start VLC detached from the TUI so closing NyRun never kills the movie.
 
     VLC's own error output goes to a log file so a bad setting can be reported.
     With `port`, VLC also listens there for NyRun's progress questions.
+    With `stdin`, VLC reads the video from that pipe (play "fd://0").
     """
     vlc = find_vlc(s.vlc_path, s.vlc_launcher)
     cmd = build_command(files, vlc, s)
@@ -224,7 +225,7 @@ def launch(files: list[Path], s: Settings, port: int | None = None, extra: list[
         log = open(log_path(), "wb")
     except OSError:
         log = subprocess.DEVNULL  # type: ignore[assignment]
-    kwargs: dict = dict(stdin=subprocess.DEVNULL, stdout=log, stderr=log, env=env)
+    kwargs: dict = dict(stdin=stdin if stdin is not None else subprocess.DEVNULL, stdout=log, stderr=log, env=env)
     if sys.platform.startswith("win"):
         kwargs["creationflags"] = 0x00000008 | 0x00000200  # DETACHED_PROCESS | NEW_PROCESS_GROUP
     else:

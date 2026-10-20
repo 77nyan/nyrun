@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import sys
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -76,6 +77,26 @@ def format_selector(opts: Options, *, download: bool, have_ffmpeg: bool) -> str:
     if h:
         return f"b{cap}/bv*{cap}+ba/b{cap}/b"
     return "b[height>=720]/bv*[height<=1080]+ba/b/bv*+ba"
+
+
+def relay_command(page_url: str, opts: Options) -> list[str]:
+    """A yt-dlp command that writes the video to stdout, for `vlc fd://0`.
+
+    yt-dlp does the fetching the way YouTube wants it (chunked requests, its own tokens), so it works
+    where handing VLC the raw address does not. With ffmpeg, the best video and audio are joined on the fly.
+    """
+    ff = find_ffmpeg(opts.ffmpeg)
+    q = opts.quality
+    cap = f"[height<={q}]" if q.isdigit() else "[height<=1080]"
+    fmt = f"bv*{cap}+ba/b{cap}/b" if ff else f"b{cap}/b"
+    exe = ytdlp_binary()
+    cmd = [exe] if exe else [sys.executable, "-m", "yt_dlp"]
+    cmd += ["--no-playlist", "--quiet", "--no-warnings", "-f", fmt, "-o", "-"]
+    if ff:
+        cmd += ["--merge-output-format", "mkv", "--ffmpeg-location", ff]
+    if opts.cookies_browser and opts.cookies_browser != "none":
+        cmd += ["--cookies-from-browser", opts.cookies_browser]
+    return cmd + ["--", page_url]
 
 
 def _friendly(msg: str) -> UrlError:
@@ -242,6 +263,7 @@ def info_to_resolved(page_url: str, info: dict) -> Resolved:
         note=note,
         ext=ext,
         via_ytdlp=True,
+        cookies=bool(main.get("cookies") or any(k.lower() == "cookie" for k in (main.get("http_headers") or {}))),
     )
 
 

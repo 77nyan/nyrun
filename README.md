@@ -176,6 +176,8 @@ Press `u` on the home screen (or run `nyrun -url`), paste a link and press Enter
 4. **yt-dlp** for the sites that hide their video (YouTube, Vimeo, Twitch, Reddit and about a thousand more). By default it is only used when steps 1-3 are not enough, or for sites it knows well. You can set it to *never* or *always* in Settings.
 5. **VLC's own scripts** as a last resort.
 
+YouTube refuses to talk to VLC directly, so for YouTube links yt-dlp fetches the video and passes it to VLC through a pipe. That works well, but VLC cannot skip forward or back in it. Save a copy with `Ctrl+D` if you want to skip around.
+
 **Saving a copy.** It is off until you enable *Allow downloading from a URL* in Settings (`,`) > *Web video*. Then press `Ctrl+D` on the URL screen (or run `nyrun -download LINK`). The video lands in `URL Downloads/<Title>/` inside your NyRun folder, with a poster when the page has one, so you can add the folder to a category later. Interrupted downloads continue where they stopped.
 
 **ffmpeg** is not part of VLC. NyRun detects it and uses it for HLS / DASH / live downloads and for joining separate video and audio tracks. Without it, plain files and ordinary HLS still download with the built-in downloader. Install it with `sudo pacman -S ffmpeg` (Arch), `sudo apt install ffmpeg`, `brew install ffmpeg`. Settings shows what is installed. For YouTube, a JavaScript runtime (`deno` or `node`) helps yt-dlp.

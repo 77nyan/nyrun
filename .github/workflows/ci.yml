@@ -8,6 +8,7 @@ on:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -19,7 +20,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Install ffmpeg (used by the URL download tests)
-        run: |
-          if [ "$RUNNER_OS" = "Linux" ]; then sudo apt-get update && sudo apt-get install -y ffmpeg; else brew install ffmpeg; fi
+        uses: FedericoCarboni/setup-ffmpeg@v3
+        continue-on-error: true  # the ffmpeg tests skip themselves when it is missing
       - run: python -m pip install -e ".[dev]"
-      - run: python -m pytest -q
+      - run: python -m pytest -v --durations=10
