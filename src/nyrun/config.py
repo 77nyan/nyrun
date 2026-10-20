@@ -75,6 +75,13 @@ class Settings:
     music_shuffle: bool = False
     music_volume: int = 80  # percent
 
+    # ---- Web video (URL) ----
+    url_downloads: bool = False  # allow saving a URL's video to disk (off by default)
+    url_ytdlp: str = "auto"  # auto = only when NyRun's own methods are not enough | never | always
+    url_quality: str = "auto"  # auto | 1080 | 720 | 480
+    url_cookies: str = "none"  # browser whose login yt-dlp may use: none | firefox | chrome | chromium | brave | edge | vivaldi | opera
+    url_download_dir: str = ""  # empty = "URL Downloads" inside your NyRun folder
+
     # ---- VLC ----
     vlc_path: str = ""  # empty = auto-detect
     vlc_launcher: str = "auto"  # auto | native | flatpak
@@ -111,6 +118,9 @@ class Settings:
         return Path(self.default_folder).expanduser() if self.default_folder else None
 
 
+URL_HISTORY_MAX = 30
+
+
 class State:
     """Mutable per-user state: watched flags, favorites, last-played timestamps.
 
@@ -126,6 +136,10 @@ class State:
         self.last_played: dict[str, float] = dict(raw.get("last_played", {}))
         self.play_count: dict[str, int] = dict(raw.get("play_count", {}))
         self.last_episode: dict[str, str] = dict(raw.get("last_episode", {}))
+        # recently opened URLs, newest first: [{"url", "title", "kind", "time"}]
+        self.url_history: list[dict] = [
+            h for h in raw.get("url_history", []) if isinstance(h, dict) and isinstance(h.get("url"), str)
+        ][:URL_HISTORY_MAX]
         # key -> [seconds watched, total seconds] for things you stopped part-way through
         self.positions: dict[str, list[float]] = {
             k: [float(v[0]), float(v[1])] for k, v in dict(raw.get("positions", {})).items()
@@ -142,6 +156,7 @@ class State:
                 "play_count": self.play_count,
                 "last_episode": self.last_episode,
                 "positions": self.positions,
+                "url_history": self.url_history,
             },
         )
 
@@ -153,6 +168,17 @@ class State:
     def set_watched(self, key: str, value: bool) -> None:
         (self.watched.add if value else self.watched.discard)(key)
         self.positions.pop(key, None)  # watched or reset: no half-way point to remember
+        self.save()
+
+    def add_url(self, url: str, title: str = "", kind: str = "") -> None:
+        """Remember a URL you opened (most recent first, no duplicates)."""
+        self.url_history = [h for h in self.url_history if h.get("url") != url]
+        self.url_history.insert(0, {"url": url, "title": title, "kind": kind, "time": time.time()})
+        del self.url_history[URL_HISTORY_MAX:]
+        self.save()
+
+    def forget_url(self, url: str) -> None:
+        self.url_history = [h for h in self.url_history if h.get("url") != url]
         self.save()
 
     def set_position(self, key: str, seconds: float, total: float) -> None:

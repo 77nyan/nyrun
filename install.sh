@@ -49,6 +49,18 @@ check_vlc() {
   fi
 }
 
+check_ffmpeg() {
+  if command -v ffmpeg >/dev/null; then
+    ok "ffmpeg found (used for downloading streams from URLs)"
+  else
+    warn "ffmpeg was not found - optional, but streams (HLS/DASH) cannot be saved without it."
+    command -v pacman >/dev/null && say "   install it with: ${B}sudo pacman -S ffmpeg${N}"
+    command -v apt    >/dev/null && say "   install it with: ${B}sudo apt install ffmpeg${N}"
+    command -v dnf    >/dev/null && say "   install it with: ${B}sudo dnf install ffmpeg${N}"
+    command -v brew   >/dev/null && say "   install it with: ${B}brew install ffmpeg${N}"
+  fi
+}
+
 # Remove any old copy first: some pipx versions (the uv-based ones) refuse "--force" over an existing install.
 pipx_fresh_install() {
   pipx uninstall nyrun >/dev/null 2>&1
@@ -61,6 +73,7 @@ do_install() {
   pipx_fresh_install || { die "Install failed."; return 1; }
   ok "NyRun installed: $(nyrun -version 2>/dev/null || echo 'open a new terminal, then run: nyrun -version')"
   check_vlc
+  check_ffmpeg
   say "${D}First time? Run:  nyrun -createfolder   then   nyrun${N}"
   case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) warn "Open a new terminal (or run: source ~/.bashrc) so the nyrun command is found." ;; esac
 }

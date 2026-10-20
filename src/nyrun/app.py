@@ -16,7 +16,7 @@ from . import omarchy, themes
 from .config import CATEGORIES, Settings, State
 from .library import Item, scan_library
 from .music import MusicSession, mmss
-from .player import VLCNotFound, last_error_lines, launch
+from .player import VLCNotFound, last_error_lines, launch, url_args
 from .watch import VideoWatcher, free_port
 from .styles import CSS
 
@@ -135,6 +135,7 @@ class NyRunApp(ThemedApp):
         self.library: dict[str, list[Item]] = {c: [] for c in CATEGORIES}
         self.music: MusicSession | None = None
         self.open_add: Path | str | None = None  # set by `nyrun -add [FILE]`
+        self.open_url: str | None = None  # set by `nyrun -url [LINK]`: open the URL screen (and play LINK)
         self.rescan()
 
     def on_mount(self) -> None:
@@ -146,6 +147,10 @@ class NyRunApp(ThemedApp):
             from .add_screen import AddScreen
 
             self.push_screen(AddScreen(self.open_add or None))
+        if self.open_url is not None:
+            from .url_screen import UrlScreen
+
+            self.push_screen(UrlScreen(self.open_url, autoplay=bool(self.open_url)))
         self.set_interval(0.5, self._music_tick)
 
     def on_unmount(self) -> None:
@@ -318,7 +323,8 @@ class NyRunApp(ThemedApp):
         if total > 0 and seconds / total * 100 >= self.settings.watched_at:
             if key not in st.watched:
                 st.set_watched(key, True)
-                self.notify("✓ Marked as watched", markup=False)
+                if not key.startswith("url:"):
+                    self.notify("✓ Marked as watched", markup=False)
         elif seconds >= 1:
             st.set_position(key, seconds, total)
         now = time.time()
@@ -327,7 +333,7 @@ class NyRunApp(ThemedApp):
             st.save()
 
     @work(thread=True, group="vlc-watch")
-    def _watch_vlc(self, proc: subprocess.Popen, files: list[Path] | None = None, tracked: bool = False) -> None:
+    def _watch_vlc(self, proc: subprocess.Popen, files: list | None = None, tracked: bool = False, extra: list[str] | None = None) -> None:
         """If VLC dies within a few seconds, tell the user why (usually a bad setting)."""
         try:
             code = proc.wait(timeout=4)
@@ -340,7 +346,7 @@ class NyRunApp(ThemedApp):
                 # this VLC does not understand the progress-tracking options: play without them
                 self._no_tracking = True
                 try:
-                    again = launch(files, self.settings)
+                    again = launch(files, self.settings, None, extra)
                 except (OSError, VLCNotFound):
                     again = None
                 if again is not None:
@@ -364,6 +370,35 @@ class NyRunApp(ThemedApp):
                 timeout=15,
                 markup=False,
             )
+
+    def play_url(self, res) -> bool:
+        """Open a resolved URL (see nyrun.urlengine) in VLC. Remembers it and tracks progress like a film."""
+        tracking = self.settings.track_progress and not self._no_tracking and not res.is_live
+        port = free_port() if tracking else None
+        extra = url_args(res)
+        files = [res.media_url]
+        try:
+            proc = launch(files, self.settings, port, extra)
+        except VLCNotFound as e:
+            self.notify(str(e), severity="error", timeout=12, markup=False)
+            return False
+        except OSError as e:
+            self.notify(f"Could not start VLC: {e}", severity="error", timeout=12, markup=False)
+            return False
+        self._watch_vlc(proc, files, bool(port), extra)
+        if self.music is not None and self.music.state == "playing":
+            self.music.toggle_pause()  # don't talk over the video
+        key = res.key
+        self.state.mark_played(key)
+        self.state.add_url(res.page_url, res.title, res.kind.value)
+        resume = self.state.resume_point(key) if self.settings.resume and not res.is_live else None
+        if tracking and port:
+            VideoWatcher(
+                proc, port, [(key, Path(res.title or "video"))],
+                lambda k, t, total, final: self.call_from_thread(self._progress, k, t, total, final, None),
+                resume_at=resume,
+            ).start()
+        return True
 
     def open_in_file_manager(self, path: Path) -> None:
         try:

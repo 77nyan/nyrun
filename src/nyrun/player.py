@@ -189,7 +189,23 @@ def watch_args(port: int, s: Settings) -> list[str]:
     return a
 
 
-def launch(files: list[Path], s: Settings, port: int | None = None) -> subprocess.Popen:
+def url_args(res) -> list[str]:
+    """VLC options for playing a resolved URL (a Resolved from nyrun.urlengine): who is asking, the title, split audio."""
+    a: list[str] = []
+    ref = res.header("Referer")
+    ua = res.header("User-Agent")
+    if ref:
+        a.append(f"--http-referrer={ref}")
+    if ua:
+        a.append(f"--http-user-agent={ua}")
+    if res.title:
+        a.append(f"--meta-title={res.title}")
+    if res.audio_url:
+        a.append(f"--input-slave={res.audio_url}")
+    return a
+
+
+def launch(files: list[Path], s: Settings, port: int | None = None, extra: list[str] | None = None) -> subprocess.Popen:
     """Start VLC detached from the TUI so closing NyRun never kills the movie.
 
     VLC's own error output goes to a log file so a bad setting can be reported.
@@ -197,8 +213,10 @@ def launch(files: list[Path], s: Settings, port: int | None = None) -> subproces
     """
     vlc = find_vlc(s.vlc_path, s.vlc_launcher)
     cmd = build_command(files, vlc, s)
-    if port:
-        cmd[len(cmd) - len(files) - 1:len(cmd) - len(files) - 1] = watch_args(port, s)  # before "--"
+    before = (extra or []) + (watch_args(port, s) if port else [])
+    if before:
+        at = len(cmd) - len(files) - 1  # just before "--"
+        cmd[at:at] = before
     env = dict(os.environ)
     env.update(vlc_env(s))
     try:

@@ -102,6 +102,7 @@ class HomeScreen(Screen):
         Binding("n", "now_playing", "Now playing"),
         Binding("i", "import_files", "Import"),
         Binding("a", "add_file", "Add a file"),
+        Binding("u", "open_url", "URL"),
         Binding("s", "app.settings", "Settings"),
     ]
 
@@ -118,6 +119,7 @@ class HomeScreen(Screen):
                 yield Tile("tile-continue", classes="-action")
                 yield Tile("tile-nowplaying", classes="-action")
                 yield Tile("tile-add", classes="-action")
+                yield Tile("tile-url", classes="-action")
                 yield Tile("tile-import", classes="-action")
                 yield Tile("tile-settings", classes="-action")
         yield Footer()
@@ -188,6 +190,7 @@ class HomeScreen(Screen):
             tile.update(tile_text("Continue", [item.title[:18], label[:18]]))
         self._draw_nowplaying()
         self.query_one("#tile-add", Tile).update(tile_text("Add a file", ["pick a file, name", "it, add a poster"]))
+        self.query_one("#tile-url", Tile).update(tile_text("URL", ["watch a link", "in VLC"]))
         self.query_one("#tile-import", Tile).update(
             tile_text("Import", ["move / copy from", "Downloads or any", "directory"])
         )
@@ -216,6 +219,8 @@ class HomeScreen(Screen):
             self.action_now_playing()
         elif tid == "tile-add":
             self.action_add_file()
+        elif tid == "tile-url":
+            self.action_open_url()
         elif tid == "tile-import":
             self.action_import_files()
         elif tid == "tile-settings":
@@ -240,6 +245,11 @@ class HomeScreen(Screen):
         from .add_screen import AddScreen
 
         self.app.push_screen(AddScreen())
+
+    def action_open_url(self) -> None:
+        from .url_screen import UrlScreen
+
+        self.app.push_screen(UrlScreen())
 
     def action_import_files(self) -> None:
         self.app.push_screen(ImportScreen())
@@ -878,6 +888,7 @@ HELP = """\
   1 2 3 4        Movies / Series / Shows / Music
   c  continue    n  now playing (music)      i  import    s  settings
   a  add a file: pick it, choose where, name it, optional poster
+  u  URL: paste a link, VLC plays it
 
 [b]Library[/b]
   arrows         move over the posters       PgUp/PgDn  flip pages
@@ -898,6 +909,12 @@ HELP = """\
   Left / Right   seek -10s / +10s            + / -      volume
   l              repeat off / album / track  s          shuffle
   Enter          play the highlighted track  x          stop      Esc  back (music keeps playing)
+
+[b]URL (watch from a link)[/b]
+  Enter          find the video and open it in VLC
+  Ctrl+D         save a copy to "URL Downloads" (turn it on in Settings)
+  Ctrl+X         stop a download            Ctrl+O  open the downloads folder
+  Down / Up      jump between the box and your recent links     Delete  forget one
 
 [b]Everywhere[/b]
   t              cycle theme                 T  theme picker

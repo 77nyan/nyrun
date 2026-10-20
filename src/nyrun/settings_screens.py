@@ -159,6 +159,15 @@ CONTINUE = [("VLC default", "default"), ("Never resume", "never"), ("Ask me", "a
 
 LOGO_LINE = [("Rainbow (RGB)", "rainbow"), ("Match my theme (follows Omarchy too)", "theme")]
 WATCHED_AT = [(f"{n}% of it", str(n)) for n in (50, 70, 80, 90, 95, 100)]
+URL_YTDLP = [("Only when NyRun's own methods are not enough (recommended)", "auto"), ("Always try yt-dlp first", "always"), ("Never use yt-dlp", "never")]
+URL_QUALITY = [("Best (sharp, may use separate video + sound)", "auto"), ("Up to 1080p", "1080"), ("Up to 720p", "720"), ("Up to 480p", "480")]
+URL_COOKIES = [("None", "none"), ("Firefox", "firefox"), ("Chrome", "chrome"), ("Chromium", "chromium"), ("Brave", "brave"), ("Edge", "edge"), ("Vivaldi", "vivaldi"), ("Opera", "opera")]
+URL_LIMITS = (
+    "NyRun's URL viewer cannot open every address that exists. That is simply impossible: some sites hide "
+    "their video, need you to be signed in, or lock it with copy protection (DRM: Netflix, Disney+, Prime "
+    "Video, Spotify...), and no program can play those outside the site's own player. Direct links, HLS and "
+    "DASH streams, live streams, and a very large number of video sites work."
+)
 MUSIC_LOOP = [("Off", "off"), ("Repeat the album", "all"), ("Repeat one track", "track")]
 
 PRESETS: dict[str, tuple[str, dict]] = {
@@ -266,6 +275,32 @@ class SettingsScreen(Screen):
             yield from self._row("Shuffle", Switch(s.music_shuffle, id="f-music_shuffle"))
             yield from self._row("Mark albums as listened when I press play", Switch(s.auto_watched, id="f-auto_watched"))
 
+            yield Label("Web video (URL)", classes="st-h")
+            yield from self._row(
+                "Allow downloading from a URL", Switch(s.url_downloads, id="f-url_downloads"),
+                "Off by default. When on, press Ctrl+D on the URL screen to save the video into a folder called "
+                "'URL Downloads' (inside your NyRun folder).",
+            )
+            yield from self._row(
+                "Use yt-dlp", Select(URL_YTDLP, value=s.url_ytdlp if s.url_ytdlp in ("auto", "always", "never") else "auto",
+                                     allow_blank=False, id="f-url_ytdlp"),
+                "yt-dlp reads the video out of well over a thousand sites. NyRun first tries its own methods "
+                "(direct links, HLS/DASH, scanning the page) and only asks yt-dlp when they are not enough.",
+            )
+            yield from self._row(
+                "Video quality", Select(URL_QUALITY, value=s.url_quality if s.url_quality in ("auto", "1080", "720", "480") else "auto",
+                                        allow_blank=False, id="f-url_quality"),
+            )
+            yield from self._row(
+                "Use my browser's login", Select(URL_COOKIES, value=s.url_cookies if s.url_cookies in dict((v, 1) for _, v in URL_COOKIES) else "none",
+                                                  allow_blank=False, id="f-url_cookies"),
+                "For videos that need you signed in or say 'confirm you are not a bot'. yt-dlp reads that browser's "
+                "cookies (only when it is used). Only pick it if you need it.",
+            )
+            yield from self._row("Download folder", Input(s.url_download_dir, placeholder="empty = <your NyRun folder>/URL Downloads", id="f-url_download_dir"))
+            yield Static(id="st-url-tools", classes="st-hint")
+            yield Static(URL_LIMITS, id="st-url-limits", classes="st-hint")
+
             yield Label("What NyRun will run", classes="st-h")
             yield Static(id="st-preview")
             yield Static(id="st-warn")
@@ -299,12 +334,30 @@ class SettingsScreen(Screen):
             out.append("Extra options: unbalanced quotes.")
         return out
 
+    @staticmethod
+    def _url_tools_text() -> Text:
+        from .urlengine import ffmpeg_tool, ytdlp_tool
+        from .urlengine.tools import js_runtime
+
+        t = Text()
+        for tool, why in ((ffmpeg_tool(), "saving HLS/DASH streams, joining video and sound"),
+                          (ytdlp_tool(), "reading videos from many websites")):
+            if tool.found:
+                t.append(f"✓ {tool.name} {tool.version}".rstrip() + f"  ({why})\n", style="green")
+            else:
+                t.append(f"✗ {tool.name} not found  ({why})  -  install: {tool.install}\n", style="yellow")
+        if ytdlp_tool().found and js_runtime() is None:
+            t.append("i YouTube works best with deno or node installed (yt-dlp uses it).\n", style="dim")
+        t.rstrip()
+        return t
+
     def _refresh_info(self) -> None:
         s: Settings = self.app.settings
         res = themes.resolve(s.theme)
         shown = "terminal colours" if res.palette is None else res.label
         self.query_one("#st-theme-now", Static).update(f"current: {s.theme}  ->  {shown}")
         self.query_one("#st-preview", Static).update(player.preview_command(s))
+        self.query_one("#st-url-tools", Static).update(self._url_tools_text())
         warn = self._warnings()
         self.query_one("#st-warn", Static).update("\n".join(f"! {w}" for w in warn))
 

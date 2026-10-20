@@ -80,6 +80,18 @@ Screen { background: $background; }
 #add-name, #add-image { width: 80; }
 #add-mode { width: 60; }
 
+/* ---------- watch from a URL ---------- */
+#url-body { height: 1fr; padding: 1 2; }
+#url-title { text-style: bold; color: $accent; margin-bottom: 1; width: 100%; }
+#url-info { color: $text-muted; height: auto; margin-bottom: 1; width: 100%; max-width: 110; }
+#url-input { width: 100%; max-width: 110; }
+#url-status { height: auto; margin-top: 1; width: 100%; }
+#url-card { height: auto; margin-top: 1; width: 100%; max-width: 110; }
+#url-progress { height: auto; margin-top: 1; width: 100%; }
+#url-recent-h { color: $text-muted; margin-top: 1; width: 100%; }
+#url-recent { height: 1fr; max-width: 110; border: round $primary 50%; background: $surface; }
+#url-recent:focus { border: round $accent; }
+
 /* ---------- modals ---------- */
 ModalScreen { align: center middle; background: $background 70%; }
 #modal-box {

@@ -199,3 +199,169 @@ def fake_watch_vlc(tmp_path, monkeypatch):
         return log
 
     return configure
+
+
+# --------------------------------------------------------------------------- #
+# a tiny web server for the URL engine tests
+# --------------------------------------------------------------------------- #
+import http.server  # noqa: E402
+import shutil  # noqa: E402
+import socketserver  # noqa: E402
+import subprocess  # noqa: E402
+import threading  # noqa: E402
+from dataclasses import dataclass, field  # noqa: E402
+
+
+@dataclass
+class Route:
+    body: bytes = b""
+    ctype: str = "text/html; charset=utf-8"
+    status: int = 200
+    headers: dict = field(default_factory=dict)
+    ranges: bool = True  # honour Range requests
+    head: bool = True  # answer HEAD
+    delay: float = 0.0  # seconds between 16 KB chunks (to test cancelling)
+
+
+class MediaServer:
+    def __init__(self):
+        self.routes: dict[str, Route] = {}
+        self.hits: dict[str, int] = {}
+        self.requests: list[tuple[str, str, dict]] = []  # (method, path, headers)
+        outer = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
+            def log_message(self, *a):  # silence
+                pass
+
+            def _serve(self, method):
+                path = self.path.split("?")[0]
+                outer.hits[path] = outer.hits.get(path, 0) + 1
+                outer.requests.append((method, self.path, {k.lower(): v for k, v in self.headers.items()}))
+                r = outer.routes.get(path)
+                if r is None:
+                    self.send_response(404)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                if method == "HEAD" and not r.head:
+                    self.send_response(405)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                body, status = r.body, r.status
+                extra = dict(r.headers)
+                rng = self.headers.get("Range")
+                if rng and r.ranges and status == 200:
+                    import re
+
+                    m = re.match(r"bytes=(\d+)-(\d*)", rng)
+                    if m:
+                        a = int(m.group(1))
+                        b = int(m.group(2)) if m.group(2) else len(body) - 1
+                        if a >= len(body):
+                            self.send_response(416)
+                            self.send_header("Content-Range", f"bytes */{len(body)}")
+                            self.send_header("Content-Length", "0")
+                            self.end_headers()
+                            return
+                        b = min(b, len(body) - 1)
+                        extra["Content-Range"] = f"bytes {a}-{b}/{len(body)}"
+                        body, status = body[a : b + 1], 206
+                self.send_response(status)
+                self.send_header("Content-Type", r.ctype)
+                if "Content-Length" not in extra:
+                    self.send_header("Content-Length", str(len(body)))
+                for k, v in extra.items():
+                    self.send_header(k, v)
+                self.end_headers()
+                if method == "HEAD":
+                    return
+                try:
+                    if r.delay:
+                        import time
+
+                        for i in range(0, len(body), 16384):
+                            self.wfile.write(body[i : i + 16384])
+                            self.wfile.flush()
+                            time.sleep(r.delay)
+                    else:
+                        self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+            def do_GET(self):
+                self._serve("GET")
+
+            def do_HEAD(self):
+                self._serve("HEAD")
+
+        class Server(socketserver.ThreadingTCPServer):
+            daemon_threads = True
+            allow_reuse_address = True
+
+        self.srv = Server(("127.0.0.1", 0), Handler)
+        self.port = self.srv.server_address[1]
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+
+    def url(self, path: str = "") -> str:
+        return f"http://127.0.0.1:{self.port}{path}"
+
+    def add(self, path: str, body=b"", ctype="text/html; charset=utf-8", **kw) -> str:
+        if isinstance(body, str):
+            body = body.encode()
+        self.routes[path] = Route(body, ctype, **kw)
+        return self.url(path)
+
+    def page(self, path: str, html: str, **kw) -> str:
+        return self.add(path, html, "text/html; charset=utf-8", **kw)
+
+    def close(self):
+        self.srv.shutdown()
+        self.srv.server_close()
+
+
+@pytest.fixture
+def web():
+    s = MediaServer()
+    yield s
+    s.close()
+
+
+MP4_BYTES = b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom" + bytes(range(256)) * 40  # looks like an mp4 (10 KB)
+PNG_BYTES = None
+
+
+def png_bytes() -> bytes:
+    from io import BytesIO
+
+    from PIL import Image
+
+    buf = BytesIO()
+    Image.new("RGB", (64, 36), (200, 60, 120)).save(buf, "PNG")
+    return buf.getvalue()
+
+
+@pytest.fixture(scope="session")
+def sample_media(tmp_path_factory):
+    """A real 2-second clip (mp4) and an HLS version of it, made with ffmpeg. Skips when ffmpeg is missing."""
+    ff = shutil.which("ffmpeg")
+    if not ff:
+        pytest.skip("ffmpeg is not installed")
+    d = tmp_path_factory.mktemp("media")
+    mp4 = d / "clip.mp4"
+    base = [ff, "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc=size=160x90:rate=10:duration=3",
+            "-f", "lavfi", "-i", "sine=frequency=440:duration=3", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+            "-g", "10", "-c:a", "aac", "-shortest"]
+    r = subprocess.run(base + [str(mp4)], capture_output=True, text=True)
+    if r.returncode != 0:
+        pytest.skip(f"ffmpeg cannot make test media: {r.stderr[-200:]}")
+    hls = d / "hls"
+    hls.mkdir()
+    r = subprocess.run(base + ["-f", "hls", "-hls_time", "1", "-hls_playlist_type", "vod", "-hls_segment_filename", str(hls / "seg%d.ts"), str(hls / "index.m3u8")],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        pytest.skip(f"ffmpeg cannot make an HLS test: {r.stderr[-200:]}")
+    return {"mp4": mp4, "hls": hls}

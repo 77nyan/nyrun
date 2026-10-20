@@ -42,6 +42,8 @@ def _help() -> None:
         ("nyrun -createfolder [PATH]", f"create the NyRun folder (default: ~/{DEFAULT_FOLDER_NAME})"),
         ("nyrun -default PATH", "choose which folder nyrun opens"),
         ("nyrun -add [FILE]", "guided: pick a file, choose where it goes, name it, optional poster"),
+        ("nyrun -url [LINK]", "watch a video from a web address in VLC (opens the URL screen)"),
+        ("nyrun -download LINK", "save a video from a web address into your URL Downloads folder"),
         ("nyrun -import PATH", "move / copy a file or folder in from Downloads or any directory"),
         ("    -to Movies|Series|Shows|Music", "where to put it (default: Movies)"),
         ("    -copy  /  -title NAME", "copy instead of move  /  folder name"),
@@ -72,6 +74,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-vlc", "--vlc", nargs="?", const="", metavar="PATH")
     p.add_argument("-theme", "--theme", nargs="?", const="", metavar="NAME")
     p.add_argument("-add", "--add", nargs="?", const="", metavar="FILE")
+    p.add_argument("-url", "--url", nargs="?", const="", metavar="LINK")
+    p.add_argument("-download", "--download", metavar="LINK")
     p.add_argument("-import", "--import", dest="import_path", metavar="PATH")
     p.add_argument("-to", "--to", metavar="CATEGORY", default="Movies")
     p.add_argument("-title", "--title", metavar="NAME")
@@ -215,6 +219,48 @@ def cmd_import(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_download(link: str) -> int:
+    """Save a video from a web address without opening the TUI."""
+    import threading
+
+    from .urlengine import Cancelled, Engine, Options, UrlError, download, downloads_root
+
+    settings = Settings.load()
+    opts = Options.from_settings(settings)
+    try:
+        with console.status("Looking for the video..."):
+            res = Engine(opts).resolve(link)
+    except UrlError as e:
+        console.print(f"[red]{e.message}[/] [dim]{e.hint}[/]")
+        return 1
+    console.print(f"[green]Found:[/] {res.title or res.media_url}  [dim]({res.kind.value}, {res.note})[/]")
+    root = downloads_root(settings, settings.root)
+    cancel = threading.Event()
+    last = {"line": ""}
+
+    def show(p) -> None:
+        pct = f"{round(p.fraction * 100)}%" if p.fraction is not None else "..."
+        line = f"  {p.stage} {pct} {p.message}".rstrip()
+        if line != last["line"]:
+            last["line"] = line
+            console.print(line, end="\r")
+
+    try:
+        path = download(res, root, opts, on_progress=show, cancel=cancel)
+    except KeyboardInterrupt:
+        cancel.set()
+        console.print("\n[yellow]Stopped.[/]")
+        return 1
+    except Cancelled:
+        console.print("\n[yellow]Stopped.[/]")
+        return 1
+    except UrlError as e:
+        console.print(f"\n[red]{e.message}[/] [dim]{e.hint}[/]")
+        return 1
+    console.print(f"\n[green]Saved[/] -> {path}")
+    return 0
+
+
 def cmd_doctor() -> int:
     import shutil
 
@@ -240,10 +286,22 @@ def cmd_doctor() -> int:
     except VLCNotFound as e:
         ok = False
         console.print(f"[red]FAIL[/] {e}")
+    from .urlengine import ffmpeg_tool, install_hint, ytdlp_tool
+
     if shutil.which("ffprobe"):
         console.print("[green]ok[/]   ffprobe found (movie durations will be shown)")
     else:
         console.print("[yellow]info[/] ffprobe not found - durations hidden (install ffmpeg to enable)")
+    ff = ffmpeg_tool()
+    if ff.found:
+        console.print(f"[green]ok[/]   ffmpeg {ff.version} (saving HLS/DASH streams, merging video and audio)")
+    else:
+        console.print(f"[yellow]info[/] ffmpeg not found - VLC does not include it. Needed to save HLS/DASH streams. Install: {install_hint('ffmpeg')}")
+    yt = ytdlp_tool()
+    if yt.found:
+        console.print(f"[green]ok[/]   yt-dlp {yt.version} ({yt.where}) - used for sites NyRun cannot read itself")
+    else:
+        console.print(f"[yellow]info[/] yt-dlp not found - many sites (YouTube, Vimeo...) will not work. Install: {yt.install}")
     try:
         import mutagen
 
@@ -308,6 +366,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_theme(args.theme)
     if args.import_path:
         return cmd_import(args)
+    if args.download:
+        return cmd_download(args.download)
     if args.doctor:
         return cmd_doctor()
     if args.list:
@@ -336,6 +396,8 @@ def main(argv: list[str] | None = None) -> int:
     app = NyRunApp(settings)
     if args.add is not None:
         app.open_add = Path(args.add).expanduser() if args.add else ""
+    if args.url is not None:
+        app.open_url = args.url
     try:
         app.run()
     finally:

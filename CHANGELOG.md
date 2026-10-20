@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.0
+- **Watch from a URL.** New *URL* tile on the home screen (key `u`, or `nyrun -url [LINK]`). Paste a link, press Enter, and it opens in VLC. Links you open are remembered in a *Recent* list (Enter replays one, Delete forgets it). A half-watched link resumes like a film.
+- **The NyRun URL engine** finds the video for you. It tries, in order: the link itself (`.mp4`, `.mkv`, `.m3u8`, `.mpd`, `rtsp://`...), what the server says the link is, a scan of the web page (`og:video`, `<video>`, JSON-LD, stream links hidden in scripts, embedded players), then **yt-dlp** (about a thousand sites), and finally VLC's own web-page scripts. Dead candidates are skipped, redirects are followed, and `Referer` / user-agent are passed on to VLC so protected links still play. HLS streams, DASH and live streams are supported.
+- **Save a copy.** Turn on *Allow downloading from a URL* in Settings, then press **Ctrl+D** on the URL screen. The video goes into `URL Downloads/<Title>/` inside your NyRun folder (or a folder you choose) with its poster, so NyRun can list it like any other film. Downloads resume if interrupted, show progress, and **Ctrl+X** stops them. HLS downloads use ffmpeg when it is installed and a built-in downloader when it is not.
+- **Settings: Web video (URL).** Downloads on/off, when to use yt-dlp (auto / never / always), quality, which browser's login yt-dlp may use, download folder. It shows whether ffmpeg, yt-dlp and a JavaScript runtime are installed (with the install command for your system) and says plainly that **no program can open every URL on earth**: logins, copy protection (DRM) and videos hidden by the site cannot work.
+- `nyrun -download LINK` saves a link from the command line. `nyrun -doctor` checks ffmpeg and yt-dlp. `install.sh` mentions ffmpeg if it is missing.
+- New dependency: `yt-dlp`.
+
 ## 1.4.4
 - The details panel (and the episode browser) only show a picture when the title has a real poster. Empty categories no longer show the purple play placeholder.
 - Posters in the grid are a little smaller (10 rows instead of 12, slightly less tall), so more of the library fits on screen.

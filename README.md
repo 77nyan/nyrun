@@ -21,6 +21,7 @@ your files stay exactly where they are, and your posters are just image files.
 - **Movies / Series / Shows / Music** categories, with a season-aware **episode browser**
 - **Music player** with a **spinning vinyl record** drawn in pixels, with the album cover as its label (see [Music](#music))
 - **Add a file** (`a`, or `nyrun -add`): a guided 5-step flow. Pick a video, choose Movies / Series / Shows / Music, type the name, optionally give it a poster image, move or copy. NyRun creates the folder with that name and puts the file and the image inside
+- **Watch from a URL** (`u`, or `nyrun -url LINK`): paste a video link, a stream (`.m3u8`, `.mpd`, `rtsp://`...) or a web page and it plays in VLC. NyRun has its own URL engine and uses yt-dlp for the sites that need it (see [Watching from a URL](#watching-from-a-url))
 - **Import screen**: **move / copy from Downloads or any directory**. Highlight a film, a show, a song or a folder and **move (cut) or copy** it into your library. NyRun picks Music for audio automatically. A lone file gets its own folder and its subtitles and poster come along
 - **Continue watching** (only shown when there is something to resume): jumps to the film or episode you left half-way (or your next unwatched episode), and the rest of the season is queued in VLC
 - **Watched** and **favorite** marks, **search**, **sort** (name / added / last played / year / size) and **views** (all / unwatched / watched / favorites)
@@ -118,6 +119,9 @@ Already have a NyRun folder from an older version? Run `nyrun -default /path/to/
 | Home | arrows / Tab, Enter | move / open |
 | Home | `1` `2` `3` `4` | Movies / Series / Shows / Music |
 | Home | `a` | add a file (pick, choose where, name it, optional poster) |
+| Home | `u` | watch from a URL |
+| URL screen | Enter / `Ctrl+D` / `Ctrl+X` / `Ctrl+O` | play in VLC / save a copy / stop the download / open the downloads folder |
+| URL screen | Down, Delete | go to the Recent list / forget a link |
 | Home | `c` / `n` / `i` / `s` | continue watching / now playing / import / settings |
 | Library | arrows, PgUp/PgDn, Home/End | move over posters / flip pages |
 | Library | Enter | play a movie, open a series |
@@ -147,6 +151,8 @@ nyrun -default PATH            choose which folder nyrun opens
 nyrun -add [FILE]              guided: pick a file, choose where it goes, name it, optional poster
 nyrun -import PATH             move / copy a file or folder in from Downloads or any directory
                                (-to Series|Shows|Music, -copy, -title "Name")
+nyrun -url [LINK]              watch a link in VLC (opens the URL screen, plays at once if you give a link)
+nyrun -download LINK           save a link's video into "URL Downloads" (turn it on in Settings first)
 nyrun -vlc                     VLC compatibility settings screen
 nyrun -vlc PATH                tell nyrun where VLC is (only if auto-detect fails)
 nyrun -theme                   theme picker with live preview
@@ -154,11 +160,27 @@ nyrun -theme NAME              set a theme directly (auto, omarchy, terminal, sa
 nyrun -theme list              list every available theme
 nyrun -theme FILE.toml         install your own theme file
 nyrun -list                    print your library without the TUI
-nyrun -doctor                  check VLC, ffprobe and poster rendering
+nyrun -doctor                  check VLC, ffmpeg, yt-dlp and poster rendering
 nyrun -version
 ```
 
 `--double-dash` spellings work as well (`nyrun --default PATH`).
+
+## Watching from a URL
+
+Press `u` on the home screen (or run `nyrun -url`), paste a link and press Enter. NyRun works out what the link is and hands VLC the real video address:
+
+1. **The link itself**: `.mp4`, `.mkv`, `.webm`, audio files, HLS (`.m3u8`), DASH (`.mpd`) and stream addresses (`rtsp://`, `rtmp://`, `udp://`...).
+2. **What the server says**: a link without an extension is checked (content type and first bytes).
+3. **A scan of the web page**: `og:video`, `<video>` / `<source>`, JSON-LD, stream links in the page's scripts, and embedded player frames. Candidates are checked and the best working one wins.
+4. **yt-dlp** for the sites that hide their video (YouTube, Vimeo, Twitch, Reddit and about a thousand more). By default it is only used when steps 1-3 are not enough, or for sites it knows well. You can set it to *never* or *always* in Settings.
+5. **VLC's own scripts** as a last resort.
+
+**Saving a copy.** It is off until you enable *Allow downloading from a URL* in Settings (`,`) > *Web video*. Then press `Ctrl+D` on the URL screen (or run `nyrun -download LINK`). The video lands in `URL Downloads/<Title>/` inside your NyRun folder, with a poster when the page has one, so you can add the folder to a category later. Interrupted downloads continue where they stopped.
+
+**ffmpeg** is not part of VLC. NyRun detects it and uses it for HLS / DASH / live downloads and for joining separate video and audio tracks. Without it, plain files and ordinary HLS still download with the built-in downloader. Install it with `sudo pacman -S ffmpeg` (Arch), `sudo apt install ffmpeg`, `brew install ffmpeg`. Settings shows what is installed. For YouTube, a JavaScript runtime (`deno` or `node`) helps yt-dlp.
+
+**Limits.** No program can open every URL that exists. Pages that need a login, services with copy protection (DRM: Netflix, Disney+, Spotify...), videos assembled by the site in a way nobody can read, and links that have expired will not work. NyRun then tells you why. It never tries to get around DRM or paywalls.
 
 ## Music
 
