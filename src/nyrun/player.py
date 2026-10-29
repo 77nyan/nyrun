@@ -64,8 +64,6 @@ def find_vlc(custom: str = "", launcher: str = "auto") -> list[str]:
             return [found]
 
     candidates: list[Path] = []
-    if sys.platform == "darwin":
-        candidates.append(Path("/Applications/VLC.app/Contents/MacOS/VLC"))
     if sys.platform.startswith("win"):
         for var in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
             base = os.environ.get(var)

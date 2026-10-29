@@ -19,7 +19,7 @@ class Tool:
 
 
 def _package_manager() -> str:
-    for pm in ("pacman", "apt", "dnf", "zypper", "brew"):
+    for pm in ("pacman", "apt", "dnf", "zypper"):
         if shutil.which(pm):
             return pm
     return ""
@@ -34,7 +34,6 @@ def install_hint(tool: str) -> str:
         "apt": f"sudo apt install {pkg}",
         "dnf": f"sudo dnf install {pkg}",
         "zypper": f"sudo zypper install {pkg}",
-        "brew": f"brew install {pkg}",
     }
     if pm in cmds:
         return cmds[pm]

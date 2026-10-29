@@ -458,9 +458,7 @@ class NyRunApp(ThemedApp):
 
     def open_in_file_manager(self, path: Path) -> None:
         try:
-            if sys.platform == "darwin":
-                subprocess.Popen(["open", str(path)])
-            elif sys.platform.startswith("win"):
+            if sys.platform.startswith("win"):
                 os.startfile(str(path))  # type: ignore[attr-defined]
             else:
                 subprocess.Popen(

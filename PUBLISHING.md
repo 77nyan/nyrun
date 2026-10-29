@@ -105,13 +105,16 @@ git push origin v1.2.0
 
 Then on GitHub: **Releases > Draft a new release**, choose tag `v1.2.0`, paste the 1.2.0 notes from `CHANGELOG.md`, **Publish release**.
 
-People can now install straight from GitHub:
+People can now install it from GitHub with the installer (the only supported way):
 
 ```bash
-pipx install git+https://github.com/77nyan/nyrun
+git clone https://github.com/77nyan/nyrun && cd nyrun
+sudo ./install.sh
 ```
 
-## 3. (Optional) Publish on PyPI so `pipx install nyrun` works
+## 3. (Optional) Publish on PyPI
+
+NyRun is installed with `sudo ./install.sh`; a PyPI upload is only needed if you also want `pip` users.
 
 1. Check the name is free: open https://pypi.org/project/nyrun/ - if it exists, pick another name
    (change `name = "nyrun"` in `pyproject.toml`; the command can stay `nyrun`).

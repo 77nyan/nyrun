@@ -30,7 +30,7 @@ _BAD = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 
 
 def safe_name(title: str, fallback: str = "video") -> str:
-    """A file/folder name that is valid on Linux, macOS and Windows."""
+    """A file/folder name that is valid on Linux and Windows."""
     name = _BAD.sub(" ", title or "")
     name = re.sub(r"\s+", " ", name).strip(" .")
     name = name[:100].strip(" .")

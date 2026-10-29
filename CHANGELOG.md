@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.0
+- **New installer.** `sudo ./install.sh` is now the only way to install NyRun. Running it with `sh`, `bash` or without `sudo` is refused with a clear message.
+- The installer is a full-screen terminal menu: **1 Install, 2 Update, 3 Uninstall, 4 Quit**. It shows what is on your computer (system, NyRun, VLC, ffmpeg, Python), runs each action as a visible list of steps, and offers to install VLC and ffmpeg for you (pacman, apt, dnf, zypper).
+- NyRun now installs for the whole computer: `/opt/nyrun` with the `nyrun` command in `/usr/local/bin`. An older pipx copy is found and, if you agree, removed. Update pulls the newest files (with `git pull` when you cloned the repo) and refreshes yt-dlp. Uninstall keeps your library, and keeps your settings unless you choose to delete them.
+- `sudo ./install.sh install|update|uninstall` runs one action without the menu (add `--yes` for scripts; it never deletes your settings).
+- **macOS is no longer supported.** Removed the macOS code, the macOS test runs and every macOS mention. NyRun is built for Linux.
+- README rewritten: shorter, with a numbered table of contents, a screenshot and collapsible details.
+
 ## 1.5.2
 - Fixed: Google Drive links (and any other site whose video address only works with cookies) opened VLC and it closed again. They now go through yt-dlp like YouTube.
 - Tests: ffmpeg is installed on the macOS runners with a prebuilt binary (the Homebrew install was what hung them), and a stuck run now stops after 25 minutes with a per-test log.

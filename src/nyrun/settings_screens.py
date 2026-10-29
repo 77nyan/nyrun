@@ -147,7 +147,6 @@ HWDEC = [
     ("VDPAU (Nvidia, Linux)", "vdpau"),
     ("D3D11 (Windows)", "d3d11va"),
     ("DXVA2 (Windows)", "dxva2"),
-    ("VideoToolbox (macOS)", "videotoolbox"),
 ]
 QT_PLATFORM = [
     ("Auto", "auto"),

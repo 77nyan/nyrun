@@ -2,7 +2,7 @@
 
 Everything is stored as small JSON files in the platform config dir:
 
-    Linux/macOS: ~/.config/nyrun/   (honours $XDG_CONFIG_HOME)
+    Linux:       ~/.config/nyrun/   (honours $XDG_CONFIG_HOME)
     Windows:     %APPDATA%\\nyrun\\
 """
 
@@ -87,7 +87,7 @@ class Settings:
     vlc_launcher: str = "auto"  # auto | native | flatpak
     fullscreen: bool = True
     vlc_play_and_exit: bool = True  # close VLC when the queue ends
-    vlc_hwdec: str = "auto"  # auto = let VLC decide; none | vaapi | vdpau | d3d11va | dxva2 | videotoolbox
+    vlc_hwdec: str = "auto"  # auto = let VLC decide; none | vaapi | vdpau | d3d11va | dxva2
     vlc_vout: str = ""  # video output module, e.g. gl, xcb_x11 (empty = VLC default)
     vlc_aout: str = ""  # audio output module, e.g. pulse, alsa (empty = VLC default)
     vlc_qt_platform: str = "auto"  # auto | xcb | wayland  (QT_QPA_PLATFORM for VLC's window)
