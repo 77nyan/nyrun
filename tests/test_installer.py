@@ -93,6 +93,11 @@ def test_install_update_uninstall_lifecycle(tmp_path):
     (home / ".local/share/pipx/venvs/nyrun").mkdir(parents=True)  # an old pipx install to clean up
     env = {"NYRUN_PREFIX": str(prefix), "NYRUN_BINDIR": str(bindir), "NYRUN_USER_HOME": str(home)}
 
+    def build_junk():  # what a pip build would leave in the source folder (CI's own `pip install -e` leaves some too)
+        return sorted(str(p) for p in [ROOT / "build", *ROOT.glob("*.egg-info"), *(ROOT / "src").glob("*.egg-info")] if p.exists())
+
+    junk_before = build_junk()
+
     r = run(["install", "--yes"], env)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "Installed" in r.stdout
@@ -102,13 +107,13 @@ def test_install_update_uninstall_lifecycle(tmp_path):
     version = (ROOT / "pyproject.toml").read_text().split('version = "')[1].split('"')[0]
     assert out.returncode == 0 and version in out.stdout
     assert not (home / ".local/share/pipx/venvs/nyrun").exists()  # the old pipx copy is gone
-    # no build junk left behind in the source folder
-    assert not (ROOT / "build").exists() and not list(ROOT.glob("*.egg-info")) and not list((ROOT / "src").glob("*.egg-info"))
+    assert build_junk() == junk_before  # installing must not leave new build files in the source folder
 
     r = run(["update", "--yes"], env)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "up to date" in r.stdout or "Updated" in r.stdout
     assert subprocess.run([str(cmd), "-version"], capture_output=True).returncode == 0
+    assert build_junk() == junk_before
 
     # --yes must never delete settings
     r = run(["uninstall", "--yes"], env)
